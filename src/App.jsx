@@ -327,7 +327,7 @@ export default function KPCarsApp() {
         dni: pick("dni", "documento", "document_number"),
         telefono: pick("telefono", "phone", "tel", "celular", "mobile"),
         email: pick("correo", "email", "mail"),
-        licenciaVencimiento: pick("licenciaVencimiento", "licencia_vencimiento", "license_expiry", "vencimiento_licencia"),
+        licenciaVencimiento: pick("fecha_vencimiento_licencia", "licenciaVencimiento", "licencia_vencimiento", "license_expiry", "vencimiento_licencia"),
         foto: toAbsoluteUrl(pick("profile_photo_url", "foto", "photo", "avatar")) || null,
         mustChangePassword: loginData.must_change_password,
         autoAsignado: asignacionActual ? mapVehiculo(asignacionActual) : null,
@@ -423,7 +423,7 @@ export default function KPCarsApp() {
         dni: pick("dni", "documento", "document_number") || user.dni,
         telefono: pick("telefono", "phone", "tel", "celular", "mobile") || user.telefono,
         email: pick("correo", "email", "mail") || user.email,
-        licenciaVencimiento: pick("licenciaVencimiento", "licencia_vencimiento", "license_expiry") || user.licenciaVencimiento,
+        licenciaVencimiento: pick("fecha_vencimiento_licencia", "licenciaVencimiento", "licencia_vencimiento", "license_expiry") || user.licenciaVencimiento,
         foto: toAbsoluteUrl(pick("profile_photo_url", "foto", "photo", "avatar")) || user.foto || null,
         autoAsignado: asignacionActual ? mapVehiculo(asignacionActual) : user.autoAsignado,
         historialAutos: asignacionesAnteriores.length > 0 ? asignacionesAnteriores.map(mapVehiculo).filter(Boolean) : user.historialAutos,
@@ -1379,7 +1379,11 @@ function ProfileTab({ user, apiFetch, onUpdate }) {
             </div>
             <div style={fieldStyle}>
               <span style={labelStyle}>Vencimiento licencia</span>
-              <span style={valueStyle}>{user.licenciaVencimiento || "—"}</span>
+              <span style={valueStyle}>
+                {user.licenciaVencimiento
+                  ? new Date(user.licenciaVencimiento + "T12:00:00").toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" })
+                  : "—"}
+              </span>
             </div>
 
             {/* Email editable */}
@@ -1500,15 +1504,18 @@ function TurnosTab({ user, apiFetch, navigate }) {
   const fetchTurnos = async (silent = false) => {
     if (!silent) setLoading(true);
     else setRefreshing(true);
-    const today = new Date();
-    const from = new Date(today); from.setMonth(from.getMonth() - 3);
-    const to = new Date(today);   to.setMonth(to.getMonth() + 3);
-    const fromStr = from.toISOString().split("T")[0];
-    const toStr   = to.toISOString().split("T")[0];
     try {
-      const res = await apiFetch(`/appointments?from=${fromStr}&to=${toStr}`);
-      const data = await res.json();
-      const all = [...(data.appointments || [])];
+      // Trae todas las páginas para mostrar el historial completo
+      let page = 1;
+      let all = [];
+      while (true) {
+        const res = await apiFetch(`/mis-turnos?page=${page}`);
+        const data = await res.json();
+        const items = data.data || [];
+        all = [...all, ...items];
+        if (all.length >= (data.total || 0) || items.length === 0) break;
+        page++;
+      }
       all.sort((a, b) => (a.scheduled_date > b.scheduled_date ? -1 : 1));
       setTurnos(all);
       setLastUpdated(new Date());
@@ -1523,8 +1530,18 @@ function TurnosTab({ user, apiFetch, navigate }) {
 
   useEffect(() => {
     fetchTurnos(false);
-    const interval = setInterval(() => fetchTurnos(true), 60000);
-    return () => clearInterval(interval);
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") fetchTurnos(true);
+    };
+    const onFocus = () => fetchTurnos(true);
+
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", onFocus);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1545,7 +1562,7 @@ function TurnosTab({ user, apiFetch, navigate }) {
     setCancelling(true);
     setCancelError("");
     try {
-      const res = await apiFetch(`/appointments/${cancelTarget.id}/cancelar`, { method: "PATCH" });
+      const res = await apiFetch(`/mis-turnos/${cancelTarget.id}/cancelar`, { method: "PATCH" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "No se pudo cancelar el turno.");
       setTurnos((prev) =>
@@ -1923,7 +1940,7 @@ function TurnosPage({ user, apiFetch }) {
     setLoading(true);
 
     try {
-      const res = await apiFetch("/appointments", {
+      const res = await apiFetch("/mis-turnos", {
         method: "POST",
         body: JSON.stringify({
           service: descripcion,
