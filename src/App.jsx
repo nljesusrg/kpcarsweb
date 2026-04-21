@@ -244,12 +244,13 @@ export default function KPCarsApp() {
 
   // Función auxiliar para hacer requests autenticados a la API
   const apiFetch = async (endpoint, options = {}) => {
+    const currentToken = token || localStorage.getItem("kpcars_token");
     const res = await fetch(`${API_BASE}${endpoint}`, {
       ...options,
       headers: {
         "Accept": "application/json",
         "Content-Type": "application/json",
-        ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        ...(currentToken ? { "Authorization": `Bearer ${currentToken}` } : {}),
         ...(options.headers || {}),
       },
     });
@@ -370,10 +371,73 @@ export default function KPCarsApp() {
     }
   };
 
-  const handlePasswordChanged = (newToken) => {
-    // El endpoint devuelve un token nuevo, lo reemplazamos
-    if (newToken) setToken(newToken);
-    setUser({ ...user, mustChangePassword: false });
+  const handlePasswordChanged = async (newToken) => {
+    const activeToken = newToken || token;
+    if (newToken) {
+      setToken(newToken);
+      localStorage.setItem("kpcars_token", newToken);
+    }
+
+    const headers = {
+      "Accept": "application/json",
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${activeToken}`,
+    };
+
+    try {
+      const [meRes, historialRes] = await Promise.all([
+        fetch(`${API_BASE}/me`, { headers }),
+        fetch(`${API_BASE}/mi-historial-vehiculos`, { headers }).catch(() => null),
+      ]);
+
+      let meProfile = user || {};
+      try {
+        const meData = await meRes.json();
+        const inner = meData.user || meData;
+        if (meRes.ok && (inner.id || inner.name || inner.dni)) meProfile = { ...meProfile, ...inner };
+      } catch {}
+
+      let historialData = null;
+      try { historialData = historialRes && historialRes.ok ? await historialRes.json() : null; } catch {}
+
+      const pick = (...keys) => { for (const k of keys) { if (meProfile[k]) return meProfile[k]; } return ""; };
+      const fullName = pick("name", "nombre", "nombres");
+      const spaceIdx = fullName.indexOf(" ");
+      const nombre = spaceIdx > 0 ? fullName.slice(0, spaceIdx) : (user.nombre || fullName);
+      const apellido = spaceIdx > 0 ? fullName.slice(spaceIdx + 1) : (user.apellido || pick("apellido", "last_name", "apellidos", "surname"));
+
+      const historialList = historialData?.historial || [];
+      const asignacionActual = historialList.find((h) => h.fecha_fin === null);
+      const asignacionesAnteriores = historialList.filter((h) => h.fecha_fin !== null);
+      const mapVehiculo = (h) => h.vehiculo ? {
+        model: `${h.vehiculo.marca} ${h.vehiculo.modelo}`, variant: "", year: String(h.vehiculo.anio || ""),
+        patente: h.vehiculo.patente || "",
+        desde: h.fecha_inicio ? new Date(h.fecha_inicio).toLocaleDateString("es-AR") : "",
+        hasta: h.fecha_fin ? new Date(h.fecha_fin).toLocaleDateString("es-AR") : null,
+      } : null;
+
+      const updated = {
+        ...user,
+        nombre,
+        apellido,
+        dni: pick("dni", "documento", "document_number") || user.dni,
+        telefono: pick("telefono", "phone", "tel", "celular", "mobile") || user.telefono,
+        email: pick("correo", "email", "mail") || user.email,
+        licenciaVencimiento: pick("licenciaVencimiento", "licencia_vencimiento", "license_expiry") || user.licenciaVencimiento,
+        foto: toAbsoluteUrl(pick("profile_photo_url", "foto", "photo", "avatar")) || user.foto || null,
+        autoAsignado: asignacionActual ? mapVehiculo(asignacionActual) : user.autoAsignado,
+        historialAutos: asignacionesAnteriores.length > 0 ? asignacionesAnteriores.map(mapVehiculo).filter(Boolean) : user.historialAutos,
+        mustChangePassword: false,
+        role: pick("role", "rol") || user.role,
+      };
+
+      setUser(updated);
+      localStorage.setItem("kpcars_user", JSON.stringify(updated));
+    } catch {
+      setUser({ ...user, mustChangePassword: false });
+      localStorage.setItem("kpcars_user", JSON.stringify({ ...user, mustChangePassword: false }));
+    }
+
     navigate("dashboard");
   };
 
@@ -1412,36 +1476,55 @@ function ProfileTab({ user, apiFetch, onUpdate }) {
   );
 }
 
+/* ── Icono refresh ── */
+const RefreshIcon = ({ size = 18, spinning = false }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+    style={{ transition: "transform 0.4s", transform: spinning ? "rotate(360deg)" : "none" }}>
+    <polyline points="23 4 23 10 17 10" />
+    <polyline points="1 20 1 14 7 14" />
+    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+  </svg>
+);
+
 /* ── Turnos del conductor ── */
 function TurnosTab({ user, apiFetch, navigate }) {
   const [turnos, setTurnos] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
   const [error, setError] = useState("");
   const [cancelTarget, setCancelTarget] = useState(null);
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState("");
 
-  useEffect(() => {
+  const fetchTurnos = async (silent = false) => {
+    if (!silent) setLoading(true);
+    else setRefreshing(true);
     const today = new Date();
-    const from = new Date(today);
-    from.setMonth(from.getMonth() - 3);
-    const to = new Date(today);
-    to.setMonth(to.getMonth() + 3);
+    const from = new Date(today); from.setMonth(from.getMonth() - 3);
+    const to = new Date(today);   to.setMonth(to.getMonth() + 3);
     const fromStr = from.toISOString().split("T")[0];
-    const toStr = to.toISOString().split("T")[0];
+    const toStr   = to.toISOString().split("T")[0];
+    try {
+      const res = await apiFetch(`/appointments?from=${fromStr}&to=${toStr}`);
+      const data = await res.json();
+      const all = [...(data.appointments || [])];
+      all.sort((a, b) => (a.scheduled_date > b.scheduled_date ? -1 : 1));
+      setTurnos(all);
+      setLastUpdated(new Date());
+      setError("");
+    } catch {
+      if (!silent) setError("No se pudo cargar el historial de turnos.");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
-    apiFetch(`/sync-turnos?from=${fromStr}&to=${toStr}`)
-      .then((res) => res.json())
-      .then((data) => {
-        const patente = user.autoAsignado?.patente?.toUpperCase();
-        const all = (data.appointments || []).filter(
-          (a) => !patente || a.license_plate?.toUpperCase() === patente
-        );
-        all.sort((a, b) => (a.scheduled_date > b.scheduled_date ? -1 : 1));
-        setTurnos(all);
-      })
-      .catch(() => setError("No se pudo cargar el historial de turnos."))
-      .finally(() => setLoading(false));
+  useEffect(() => {
+    fetchTurnos(false);
+    const interval = setInterval(() => fetchTurnos(true), 60000);
+    return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1462,7 +1545,7 @@ function TurnosTab({ user, apiFetch, navigate }) {
     setCancelling(true);
     setCancelError("");
     try {
-      const res = await apiFetch(`/turnos-externos/${cancelTarget.id}/cancelar`, { method: "PATCH" });
+      const res = await apiFetch(`/appointments/${cancelTarget.id}/cancelar`, { method: "PATCH" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "No se pudo cancelar el turno.");
       setTurnos((prev) =>
@@ -1558,6 +1641,27 @@ function TurnosTab({ user, apiFetch, navigate }) {
           </div>
         </div>
       )}
+
+      {/* Header con refresh */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+        <div>
+          <p style={{ fontSize: "0.78rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: theme.gray400 }}>Mis Turnos</p>
+          {lastUpdated && (
+            <p style={{ fontSize: "0.72rem", color: theme.gray400, marginTop: 2 }}>
+              Actualizado {lastUpdated.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
+            </p>
+          )}
+        </div>
+        <button
+          onClick={() => fetchTurnos(true)}
+          disabled={refreshing}
+          title="Actualizar turnos"
+          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, color: theme.gray300, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: "0.8rem", cursor: refreshing ? "not-allowed" : "pointer", opacity: refreshing ? 0.6 : 1 }}
+        >
+          <RefreshIcon size={14} spinning={refreshing} />
+          {refreshing ? "Actualizando…" : "Actualizar"}
+        </button>
+      </div>
 
       {/* Próximos */}
       <div style={{ marginBottom: 32 }}>
@@ -1819,12 +1923,10 @@ function TurnosPage({ user, apiFetch }) {
     setLoading(true);
 
     try {
-      const res = await apiFetch("/turnos-externos", {
+      const res = await apiFetch("/appointments", {
         method: "POST",
         body: JSON.stringify({
           service: descripcion,
-          license_plate: user.autoAsignado?.patente || "",
-          applicant: [user.nombre, user.apellido].filter(Boolean).join(" "),
           preferred_date: isUrgente ? new Date().toISOString().split("T")[0] : selectedDate,
           type: isUrgente ? "emergencia" : "normal",
         }),
