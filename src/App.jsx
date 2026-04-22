@@ -1565,12 +1565,13 @@ function TurnosTab({ user, apiFetch, navigate }) {
   const [cancelTarget, setCancelTarget] = useState(null);
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState("");
+  const [sortBy, setSortBy] = useState("turno"); // "turno" | "solicitud"
+  const [order, setOrder] = useState("desc"); // "desc" | "asc"
 
   const fetchTurnos = async (silent = false) => {
     if (!silent) setLoading(true);
     else setRefreshing(true);
     try {
-      // Trae todas las páginas para mostrar el historial completo
       let page = 1;
       let all = [];
       while (true) {
@@ -1581,7 +1582,6 @@ function TurnosTab({ user, apiFetch, navigate }) {
         if (page >= (data.last_page || 1) || items.length === 0) break;
         page++;
       }
-      all.sort((a, b) => (a.scheduled_date > b.scheduled_date ? -1 : 1));
       setTurnos(all);
       setLastUpdated(new Date());
       setError("");
@@ -1595,12 +1595,8 @@ function TurnosTab({ user, apiFetch, navigate }) {
 
   useEffect(() => {
     fetchTurnos(false);
-
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") fetchTurnos(true);
-    };
+    const onVisibility = () => { if (document.visibilityState === "visible") fetchTurnos(true); };
     const onFocus = () => fetchTurnos(true);
-
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("focus", onFocus);
     return () => {
@@ -1611,9 +1607,18 @@ function TurnosTab({ user, apiFetch, navigate }) {
   }, []);
 
   const todayStr = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })();
-  const dateOf = (t) => t.scheduled_date?.split("T")[0] ?? "";
-  const proximos = (turnos || []).filter((t) => dateOf(t) >= todayStr);
-  const pasados = (turnos || []).filter((t) => dateOf(t) < todayStr);
+  const tomorrowStr = (() => { const d = new Date(); d.setDate(d.getDate()+1); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })();
+
+  const scheduledDay = (t) => t.scheduled_date?.split("T")[0] ?? "";
+  const requestedDay = (t) => t.created_at?.split("T")[0] ?? t.scheduled_date?.split("T")[0] ?? "";
+  const groupKey = (t) => sortBy === "turno" ? scheduledDay(t) : requestedDay(t);
+
+  const formatDayHeader = (dateStr) => {
+    if (!dateStr) return "—";
+    if (dateStr === todayStr) return "Hoy";
+    if (dateStr === tomorrowStr) return "Mañana";
+    return new Date(dateStr + "T12:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  };
 
   const statusConfig = {
     agendado:   { label: "Agendado",    color: theme.orange,  bg: "rgba(235,136,0,0.1)"    },
@@ -1641,13 +1646,40 @@ function TurnosTab({ user, apiFetch, navigate }) {
     }
   };
 
+  // Valor completo para ordenar (usa datetime, no solo día)
+  const sortValue = (t) => sortBy === "turno"
+    ? (t.scheduled_date ?? "")
+    : (t.created_at ?? t.scheduled_date ?? "");
+
+  // Ordenar todos los turnos por datetime completo
+  const sorted = [...(turnos || [])].sort((a, b) => {
+    const va = sortValue(a), vb = sortValue(b);
+    return order === "desc" ? vb.localeCompare(va) : va.localeCompare(vb);
+  });
+
+  // Agrupar por día manteniendo el orden ya aplicado
+  const grouped = {};
+  sorted.forEach((t) => {
+    const key = groupKey(t);
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(t);
+  });
+
+  // Los días siguen el mismo orden que los turnos dentro
+  const allDays = [...new Set(sorted.map(groupKey))];
+
+  // En modo "turno": próximos y pasados respetan el order elegido
+  const upcomingDays = sortBy === "turno" ? allDays.filter((d) => d >= todayStr) : [];
+  const pastDays = sortBy === "turno" ? allDays.filter((d) => d < todayStr) : allDays;
+
   const TurnoCard = ({ t }) => {
     const s = statusConfig[t.status] || statusConfig.agendado;
-    const datePart = dateOf(t);
-    const fechaLabel = datePart
-      ? new Date(datePart + "T12:00:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short", year: "numeric" })
-      : "—";
+    const datePart = scheduledDay(t);
     const canCancel = t.status === "agendado" && datePart >= todayStr;
+    // En modo "solicitud", mostrar la fecha del turno en la card
+    const subInfo = sortBy === "solicitud" && datePart
+      ? `Turno: ${new Date(datePart + "T12:00:00").toLocaleDateString("es-AR", { day: "numeric", month: "short", year: "numeric" })} · ${t.license_plate || ""}`
+      : (t.license_plate || "");
     return (
       <div className="turno-card" style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", background: "rgba(255,255,255,0.02)", borderRadius: 12, border: "1px solid rgba(255,255,255,0.05)" }}>
         <div style={{ width: 44, height: 44, borderRadius: 10, background: s.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: s.color }}>
@@ -1655,7 +1687,7 @@ function TurnosTab({ user, apiFetch, navigate }) {
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: "0.9rem", fontWeight: 600, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.service}</div>
-          <div style={{ fontSize: "0.78rem", color: theme.gray400 }}>{fechaLabel} · {t.license_plate}</div>
+          {subInfo && <div style={{ fontSize: "0.78rem", color: theme.gray400 }}>{subInfo}</div>}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
           <div className="turno-badge" style={{ background: s.bg, color: s.color, fontSize: "0.72rem", fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: 0.5 }}>
@@ -1675,6 +1707,28 @@ function TurnosTab({ user, apiFetch, navigate }) {
     );
   };
 
+  const DayGroup = ({ dateStr, items, accent = false }) => (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+        <span style={{ fontSize: "0.82rem", fontWeight: 700, color: accent ? theme.orange : theme.gray300 }}>
+          {formatDayHeader(dateStr)}
+        </span>
+        <span style={{ fontSize: "0.72rem", color: theme.gray400, fontWeight: 500 }}>
+          {dateStr && dateStr !== todayStr && dateStr !== tomorrowStr
+            ? new Date(dateStr + "T12:00:00").toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" })
+            : ""}
+        </span>
+        <div style={{ flex: 1, height: 1, background: accent ? "rgba(235,136,0,0.2)" : "rgba(255,255,255,0.06)" }} />
+        <span style={{ fontSize: "0.7rem", color: theme.gray400, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 20, padding: "2px 8px" }}>
+          {items.length} {items.length === 1 ? "turno" : "turnos"}
+        </span>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {items.map((t) => <TurnoCard key={t.id} t={t} />)}
+      </div>
+    </div>
+  );
+
   if (loading) return (
     <div style={{ textAlign: "center", padding: "48px 0", color: theme.gray400 }}>Cargando turnos...</div>
   );
@@ -1684,8 +1738,15 @@ function TurnosTab({ user, apiFetch, navigate }) {
   );
 
   const cancelDateLabel = cancelTarget
-    ? new Date((dateOf(cancelTarget)) + "T12:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" })
+    ? new Date(scheduledDay(cancelTarget) + "T12:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" })
     : "";
+
+  const sortBtnStyle = (active) => ({
+    padding: "7px 14px", borderRadius: 8, fontSize: "0.8rem", fontWeight: 600,
+    fontFamily: "'DM Sans', sans-serif", cursor: "pointer", border: "none",
+    background: active ? theme.orange : "rgba(255,255,255,0.06)",
+    color: active ? theme.black : theme.gray300,
+  });
 
   return (
     <div className="anim-in">
@@ -1705,18 +1766,12 @@ function TurnosTab({ user, apiFetch, navigate }) {
             </p>
             {cancelError && <p style={{ fontSize: "0.82rem", color: "#ff4444", marginBottom: 12 }}>{cancelError}</p>}
             <div style={{ display: "flex", gap: 10 }}>
-              <button
-                onClick={() => setCancelTarget(null)}
-                disabled={cancelling}
-                style={{ flex: 1, padding: "11px 0", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, color: theme.white, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: "0.88rem", cursor: "pointer" }}
-              >
+              <button onClick={() => setCancelTarget(null)} disabled={cancelling}
+                style={{ flex: 1, padding: "11px 0", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, color: theme.white, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: "0.88rem", cursor: "pointer" }}>
                 Volver
               </button>
-              <button
-                onClick={handleCancelConfirm}
-                disabled={cancelling}
-                style={{ flex: 1, padding: "11px 0", background: cancelling ? theme.gray600 : "#c62828", border: "none", borderRadius: 10, color: theme.white, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: "0.88rem", cursor: cancelling ? "not-allowed" : "pointer" }}
-              >
+              <button onClick={handleCancelConfirm} disabled={cancelling}
+                style={{ flex: 1, padding: "11px 0", background: cancelling ? theme.gray600 : "#c62828", border: "none", borderRadius: 10, color: theme.white, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: "0.88rem", cursor: cancelling ? "not-allowed" : "pointer" }}>
                 {cancelling ? "Cancelando..." : "Confirmar cancelación"}
               </button>
             </div>
@@ -1724,8 +1779,8 @@ function TurnosTab({ user, apiFetch, navigate }) {
         </div>
       )}
 
-      {/* Header con refresh */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
         <div>
           <p style={{ fontSize: "0.78rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: theme.gray400 }}>Mis Turnos</p>
           {lastUpdated && (
@@ -1734,45 +1789,61 @@ function TurnosTab({ user, apiFetch, navigate }) {
             </p>
           )}
         </div>
-        <button
-          onClick={() => fetchTurnos(true)}
-          disabled={refreshing}
-          title="Actualizar turnos"
-          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, color: theme.gray300, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: "0.8rem", cursor: refreshing ? "not-allowed" : "pointer", opacity: refreshing ? 0.6 : 1 }}
-        >
+        <button onClick={() => fetchTurnos(true)} disabled={refreshing} title="Actualizar turnos"
+          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, color: theme.gray300, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: "0.8rem", cursor: refreshing ? "not-allowed" : "pointer", opacity: refreshing ? 0.6 : 1 }}>
           <RefreshIcon size={14} spinning={refreshing} />
           {refreshing ? "Actualizando…" : "Actualizar"}
         </button>
       </div>
 
-      {/* Próximos */}
-      <div style={{ marginBottom: 32 }}>
-        <p style={{ fontSize: "0.78rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: theme.orange, marginBottom: 14 }}>Próximos turnos</p>
-        {proximos.length === 0 ? (
-          <div style={{ background: theme.gray900, border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: 24, textAlign: "center" }}>
-            <p style={{ color: theme.gray400, fontSize: "0.9rem", marginBottom: 14 }}>No tenés turnos agendados.</p>
-            <button
-              onClick={() => navigate("turnos")}
-              style={{ padding: "10px 20px", background: theme.orange, border: "none", borderRadius: 8, color: theme.black, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer" }}
-            >
-              Solicitar turno →
-            </button>
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {proximos.map((t) => <TurnoCard key={t.id} t={t} />)}
-          </div>
-        )}
+      {/* Filtros */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 6, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, padding: 4 }}>
+          <button style={sortBtnStyle(sortBy === "turno")} onClick={() => setSortBy("turno")}>Por día de turno</button>
+          <button style={sortBtnStyle(sortBy === "solicitud")} onClick={() => setSortBy("solicitud")}>Por día de solicitud</button>
+        </div>
+        <div style={{ display: "flex", gap: 6, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, padding: 4 }}>
+          <button style={sortBtnStyle(order === "desc")} onClick={() => setOrder("desc")}>Más nuevo primero</button>
+          <button style={sortBtnStyle(order === "asc")} onClick={() => setOrder("asc")}>Más viejo primero</button>
+        </div>
       </div>
 
-      {/* Historial */}
-      {pasados.length > 0 && (
-        <div>
-          <p style={{ fontSize: "0.78rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: theme.gray400, marginBottom: 14 }}>Historial</p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {pasados.map((t) => <TurnoCard key={t.id} t={t} />)}
+      {/* Contenido agrupado */}
+      {sortBy === "turno" ? (
+        <>
+          {/* Próximos */}
+          <div style={{ marginBottom: 32 }}>
+            <p style={{ fontSize: "0.78rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: theme.orange, marginBottom: 16 }}>Próximos</p>
+            {upcomingDays.length === 0 ? (
+              <div style={{ background: theme.gray900, border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: 24, textAlign: "center" }}>
+                <p style={{ color: theme.gray400, fontSize: "0.9rem", marginBottom: 14 }}>No tenés turnos agendados.</p>
+                <button onClick={() => navigate("turnos")}
+                  style={{ padding: "10px 20px", background: theme.orange, border: "none", borderRadius: 8, color: theme.black, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer" }}>
+                  Solicitar turno →
+                </button>
+              </div>
+            ) : (
+              upcomingDays.map((d) => <DayGroup key={d} dateStr={d} items={grouped[d]} accent={d === todayStr || d === tomorrowStr} />)
+            )}
           </div>
-        </div>
+          {/* Historial */}
+          {pastDays.length > 0 && (
+            <div>
+              <p style={{ fontSize: "0.78rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: theme.gray400, marginBottom: 16 }}>Historial</p>
+              {pastDays.map((d) => <DayGroup key={d} dateStr={d} items={grouped[d]} accent={false} />)}
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          {allDays.length === 0 ? (
+            <div style={{ background: theme.gray900, border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: 24, textAlign: "center" }}>
+              <p style={{ color: theme.gray400, fontSize: "0.9rem" }}>No hay turnos registrados.</p>
+            </div>
+          ) : (
+            allDays.map((d) => <DayGroup key={d} dateStr={d} items={grouped[d]} accent={false} />)
+          )}
+        </>
       )}
     </div>
   );
@@ -2063,14 +2134,14 @@ function TurnosPage({ user, apiFetch, navigate }) {
               <p style={{ color: theme.gray400, fontSize: "0.84rem", marginTop: 16, lineHeight: 1.5 }}>
                 Presentate puntual. Si no podés asistir, cancelá con al menos <strong style={{ color: theme.white }}>24 hs de anticipación</strong> para evitar que cuente como turno perdido.
               </p>
+              <button
+                onClick={() => navigate("dashboard")}
+                style={{ marginTop: 28, padding: "11px 24px", background: theme.orange, border: "none", borderRadius: 10, color: theme.black, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: "0.9rem", cursor: "pointer" }}
+              >
+                Volver al panel
+              </button>
             </>
           )}
-          <button
-            onClick={() => navigate("dashboard")}
-            style={{ marginTop: 28, padding: "11px 24px", background: theme.orange, border: "none", borderRadius: 10, color: theme.black, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: "0.9rem", cursor: "pointer" }}
-          >
-            Ver mis turnos →
-          </button>
         </div>
       </div>
     );
