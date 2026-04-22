@@ -136,13 +136,15 @@ const UserIcon = ({ size = 18 }) => (
 
 const ProfileAvatar = ({ user, size = 160 }) => {
   const [broken, setBroken] = useState(false);
+  const foto = user?.foto || null;
+  useEffect(() => { setBroken(false); }, [foto]);
   const initials = ((user?.nombre?.[0] || "") + (user?.apellido?.[0] || "")).toUpperCase() || "?";
   const fontSize = Math.round(size * 0.3);
 
-  if (user?.foto && !broken) {
+  if (foto && !broken) {
     return (
       <img
-        src={user.foto}
+        src={foto}
         alt="Foto de perfil"
         style={{ width: "100%", height: "100%", objectFit: "cover" }}
         onError={() => setBroken(true)}
@@ -236,9 +238,20 @@ export default function KPCarsApp() {
   });
   const [token, setToken] = useState(() => localStorage.getItem("kpcars_token") || null);
 
+  const pageTitles = {
+    home: "KPCars — Alquiler de autos para conductores en Buenos Aires",
+    catalog: "Flota — KPCars",
+    apply: "Quiero manejar — KPCars",
+    login: "Zona Conductores — KPCars",
+    "change-password": "Cambiar contraseña — KPCars",
+    dashboard: "Mi Panel — KPCars",
+    turnos: "Solicitar turno — KPCars",
+  };
+
   const navigate = (p) => {
     setPage(p);
     setMenuOpen(false);
+    document.title = pageTitles[p] || "KPCars";
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -249,7 +262,7 @@ export default function KPCarsApp() {
       ...options,
       headers: {
         "Accept": "application/json",
-        "Content-Type": "application/json",
+        ...(options.body ? { "Content-Type": "application/json" } : {}),
         ...(currentToken ? { "Authorization": `Bearer ${currentToken}` } : {}),
         ...(options.headers || {}),
       },
@@ -456,7 +469,6 @@ export default function KPCarsApp() {
 
   return (
     <div style={{ fontFamily: "'DM Sans', sans-serif", background: theme.black, color: theme.white, minHeight: "100vh", WebkitFontSmoothing: "antialiased" }}>
-      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Archivo+Black&display=swap" rel="stylesheet" />
       <style>{`
         * { margin: 0; padding: 0; box-sizing: border-box; }
         html, body { background: ${theme.black}; min-height: 100%; }
@@ -483,10 +495,10 @@ export default function KPCarsApp() {
       {page === "home" && <HomePage navigate={navigate} user={user} />}
       {page === "catalog" && <CatalogPage navigate={navigate} user={user} />}
       {page === "apply" && <ApplyPage />}
-      {page === "login" && <LoginPage onLogin={handleLogin} />}
+      {page === "login" && (user ? navigate("dashboard") || null : <LoginPage onLogin={handleLogin} />)}
       {page === "change-password" && user && <ChangePasswordPage user={user} token={token} onComplete={handlePasswordChanged} />}
       {page === "dashboard" && user && <DashboardPage user={user} navigate={navigate} apiFetch={apiFetch} onUserUpdate={(updated) => { setUser(updated); localStorage.setItem("kpcars_user", JSON.stringify(updated)); }} />}
-      {page === "turnos" && user && <TurnosPage user={user} apiFetch={apiFetch} />}
+      {page === "turnos" && user && <TurnosPage user={user} apiFetch={apiFetch} navigate={navigate} />}
 
       {!["dashboard", "turnos", "change-password"].includes(page) && <Footer navigate={navigate} user={user} />}
 
@@ -542,28 +554,31 @@ function Nav({ page, navigate, menuOpen, setMenuOpen, user, onLogout }) {
       </div>
 
       {menuOpen && (
-        <div style={s.mobileLinks}>
-          <a style={s.link(page === "home")} onClick={() => navigate("home")}>Inicio</a>
-          <a style={s.link(page === "catalog")} onClick={() => navigate("catalog")}>Flota</a>
-          <div style={{ height: 1, background: "rgba(255,255,255,0.06)", margin: "6px 0" }} />
-          {user ? (
-            <>
-              <a style={s.link(page === "dashboard")} onClick={() => navigate("dashboard")}>Mi Panel</a>
-              <a style={s.link(page === "turnos")} onClick={() => navigate("turnos")}>Turnos</a>
-              <a style={{ ...s.link(false), marginTop: 2 }} onClick={onLogout}>Cerrar sesión</a>
-            </>
-          ) : (
-            <>
-              <a style={{ ...s.cta, textAlign: "center", padding: "12px 16px" }} onClick={() => navigate("apply")}>Quiero manejar</a>
-              <a
-                onClick={() => navigate("login")}
-                style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 6, padding: "12px 16px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 10, color: theme.white, fontSize: "0.9rem", fontWeight: 600, cursor: "pointer" }}
-              >
-                <UserIcon size={16} /> Zona Conductores
-              </a>
-            </>
-          )}
-        </div>
+        <>
+          <div onClick={() => setMenuOpen(false)} style={{ position: "fixed", inset: 0, top: 64, zIndex: 98 }} />
+          <div style={{ ...s.mobileLinks, zIndex: 99, position: "absolute" }}>
+            <a style={s.link(page === "home")} onClick={() => navigate("home")}>Inicio</a>
+            <a style={s.link(page === "catalog")} onClick={() => navigate("catalog")}>Flota</a>
+            <div style={{ height: 1, background: "rgba(255,255,255,0.06)", margin: "6px 0" }} />
+            {user ? (
+              <>
+                <a style={s.link(page === "dashboard")} onClick={() => navigate("dashboard")}>Mi Panel</a>
+                <a style={s.link(page === "turnos")} onClick={() => navigate("turnos")}>Turnos</a>
+                <a style={{ ...s.link(false), marginTop: 2 }} onClick={onLogout}>Cerrar sesión</a>
+              </>
+            ) : (
+              <>
+                <a style={{ ...s.cta, textAlign: "center", padding: "12px 16px" }} onClick={() => navigate("apply")}>Quiero manejar</a>
+                <a
+                  onClick={() => navigate("login")}
+                  style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 6, padding: "12px 16px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 10, color: theme.white, fontSize: "0.9rem", fontWeight: 600, cursor: "pointer" }}
+                >
+                  <UserIcon size={16} /> Zona Conductores
+                </a>
+              </>
+            )}
+          </div>
+        </>
       )}
 
       <style>{`
@@ -1144,6 +1159,7 @@ function LoginPage({ onLogin }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showForgot, setShowForgot] = useState(false);
+  const passwordRef = useRef();
 
   const inputStyle = { width: "100%", padding: "14px 16px", background: theme.gray800, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, color: theme.white, fontFamily: "'DM Sans', sans-serif", fontSize: "0.95rem" };
 
@@ -1209,7 +1225,7 @@ function LoginPage({ onLogin }) {
               onChange={(e) => setDni(e.target.value.replace(/[^0-9]/g, ""))}
               style={inputStyle}
               placeholder="Ej: 12345678"
-              onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); passwordRef.current?.focus(); } }}
             />
           </div>
 
@@ -1217,6 +1233,7 @@ function LoginPage({ onLogin }) {
             <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, marginBottom: 7, color: theme.gray200 }}>Contraseña <span style={{ color: theme.orange }}>*</span></label>
             <div style={{ position: "relative" }}>
               <input
+                ref={passwordRef}
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -1241,14 +1258,19 @@ function LoginPage({ onLogin }) {
           </button>
 
           {showForgot && (
-            <div style={{ background: "rgba(235,136,0,0.08)", border: "1px solid rgba(235,136,0,0.2)", borderRadius: 10, padding: 16, marginBottom: 20, fontSize: "0.85rem", color: theme.gray200, lineHeight: 1.6 }}>
-              Para recuperar tu contraseña, comunicate con la central de KPCars:
-              <br /><br />
-              <strong style={{ color: theme.white }}>WhatsApp:</strong>{" "}
-              <a href="https://wa.me/541123850982" target="_blank" rel="noopener noreferrer" style={{ color: theme.orange, textDecoration: "none" }}>+54 11 2385-0982</a>
-              <br />
-              <strong style={{ color: theme.white }}>Email:</strong>{" "}
-              <a href="mailto:info@kpcars.com.ar" style={{ color: theme.orange, textDecoration: "none" }}>info@kpcars.com.ar</a>
+            <div style={{ background: "rgba(235,136,0,0.08)", border: "1px solid rgba(235,136,0,0.2)", borderRadius: 10, padding: 16, marginBottom: 20 }}>
+              <p style={{ fontSize: "0.85rem", color: theme.gray200, lineHeight: 1.6, marginBottom: 12 }}>
+                Para recuperar tu contraseña, comunicate con la central de KPCars:
+              </p>
+              <a
+                href="https://wa.me/541123850982?text=Hola%2C%20necesito%20recuperar%20mi%20contrase%C3%B1a"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "10px 16px", background: "#25D366", border: "none", borderRadius: 8, color: theme.white, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer", textDecoration: "none" }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+                Escribir por WhatsApp
+              </a>
             </div>
           )}
 
@@ -1289,7 +1311,7 @@ function DashboardPage({ user, navigate, apiFetch, onUserUpdate }) {
     <div style={{ paddingTop: 84, maxWidth: 900, margin: "0 auto", padding: "84px 20px 80px" }}>
       <div className="anim-in" style={{ marginBottom: 32 }}>
         <SectionLabel>Panel del conductor</SectionLabel>
-        <SectionTitle>Hola, {user.nombre}</SectionTitle>
+        <SectionTitle>Hola, {user.nombre || "Conductor"}</SectionTitle>
       </div>
 
       <div className="dash-tabs">
@@ -1313,20 +1335,60 @@ function ProfileTab({ user, apiFetch, onUpdate }) {
   const [saveError, setSaveError] = useState("");
   const [saveOk, setSaveOk] = useState(false);
 
+  const syncMe = async () => {
+    try {
+      const res = await apiFetch("/me");
+      const data = await res.json();
+      const inner = data.user || data;
+      if (!inner.id && !inner.name) return;
+      const updated = {
+        ...user,
+        email: inner.correo || inner.email || user.email,
+        telefono: inner.telefono || user.telefono,
+        licenciaVencimiento: inner.fecha_vencimiento_licencia || user.licenciaVencimiento,
+        foto: inner.profile_photo_url ? toAbsoluteUrl(inner.profile_photo_url) : user.foto,
+      };
+      onUpdate(updated);
+      if (!editing) {
+        setEmail(updated.email || "");
+        setTelefono(updated.telefono || "");
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    syncMe();
+    const onVisibility = () => { if (document.visibilityState === "visible") syncMe(); };
+    const onFocus = () => syncMe();
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", onFocus);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleSave = async () => {
     setSaving(true);
     setSaveError("");
     setSaveOk(false);
     try {
+      const payload = {};
+      if (email.trim()) payload.correo = email.trim();
+      if (telefono.trim()) payload.telefono = telefono.trim();
       const res = await apiFetch("/me", {
         method: "PATCH",
-        body: JSON.stringify({ correo: email, telefono }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "No se pudo guardar.");
-      onUpdate({ ...user, email, telefono });
+      const updated = { ...user, email, telefono };
+      onUpdate(updated);
       setSaveOk(true);
       setEditing(false);
+      setTimeout(() => setSaveOk(false), 3000);
+      syncMe();
     } catch (e) {
       setSaveError(e.message);
     } finally {
@@ -1482,12 +1544,15 @@ function ProfileTab({ user, apiFetch, onUpdate }) {
 
 /* ── Icono refresh ── */
 const RefreshIcon = ({ size = 18, spinning = false }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-    style={{ transition: "transform 0.4s", transform: spinning ? "rotate(360deg)" : "none" }}>
-    <polyline points="23 4 23 10 17 10" />
-    <polyline points="1 20 1 14 7 14" />
-    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-  </svg>
+  <>
+    <style>{`@keyframes spin-icon { to { transform: rotate(360deg); } }`}</style>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+      style={{ animation: spinning ? "spin-icon 0.8s linear infinite" : "none" }}>
+      <polyline points="23 4 23 10 17 10" />
+      <polyline points="1 20 1 14 7 14" />
+      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+    </svg>
+  </>
 );
 
 /* ── Turnos del conductor ── */
@@ -1513,7 +1578,7 @@ function TurnosTab({ user, apiFetch, navigate }) {
         const data = await res.json();
         const items = data.data || [];
         all = [...all, ...items];
-        if (all.length >= (data.total || 0) || items.length === 0) break;
+        if (page >= (data.last_page || 1) || items.length === 0) break;
         page++;
       }
       all.sort((a, b) => (a.scheduled_date > b.scheduled_date ? -1 : 1));
@@ -1545,7 +1610,7 @@ function TurnosTab({ user, apiFetch, navigate }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })();
   const dateOf = (t) => t.scheduled_date?.split("T")[0] ?? "";
   const proximos = (turnos || []).filter((t) => dateOf(t) >= todayStr);
   const pasados = (turnos || []).filter((t) => dateOf(t) < todayStr);
@@ -1562,7 +1627,7 @@ function TurnosTab({ user, apiFetch, navigate }) {
     setCancelling(true);
     setCancelError("");
     try {
-      const res = await apiFetch(`/mis-turnos/${cancelTarget.id}/cancelar`, { method: "PATCH" });
+      const res = await apiFetch(`/turnos-externos/${cancelTarget.id}/cancelar`, { method: "PATCH" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "No se pudo cancelar el turno.");
       setTurnos((prev) =>
@@ -1807,6 +1872,7 @@ function ChangePasswordPage({ user, token, onComplete }) {
                 onChange={(e) => setNewPass(e.target.value)}
                 style={{ ...inputStyle, paddingRight: 48 }}
                 placeholder="Mínimo 8 caracteres"
+                onKeyDown={(e) => e.key === "Enter" && handleChange()}
               />
               <button onClick={() => setShowNew(!showNew)} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: theme.gray400, cursor: "pointer", fontSize: "0.8rem", fontFamily: "'DM Sans', sans-serif" }}>
                 {showNew ? "Ocultar" : "Ver"}
@@ -1851,7 +1917,7 @@ function ChangePasswordPage({ user, token, onComplete }) {
 /* ─────────────────────────────────────────────
    TURNOS PAGE (formulario completo)
    ───────────────────────────────────────────── */
-function TurnosPage({ user, apiFetch }) {
+function TurnosPage({ user, apiFetch, navigate }) {
   const [urgencia, setUrgencia] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [selectedDate, setSelectedDate] = useState(null);
@@ -1882,14 +1948,14 @@ function TurnosPage({ user, apiFetch }) {
       .then((data) => {
         const counts = {};
         (data.appointments || []).forEach((apt) => {
-          if (apt.type === "normal") {
+          if (apt.type?.toLowerCase() === "normal") {
             const key = apt.scheduled_date?.split("T")[0] ?? "";
             if (key) counts[key] = (counts[key] || 0) + 1;
           }
         });
         setFullDates(Object.keys(counts).filter((d) => counts[d] >= 4));
       })
-      .catch(() => {})
+      .catch((err) => { console.error("sync-turnos error:", err); })
       .finally(() => setLoadingDates(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentMonth, urgencia]);
@@ -1903,7 +1969,7 @@ function TurnosPage({ user, apiFetch }) {
     for (let d = 1; d <= 31; d++) {
       const date = new Date(y, m, d);
       if (date.getMonth() !== m) break;
-      const dateStr = date.toISOString().split("T")[0];
+      const dateStr = `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
       if (date >= today && date.getDay() !== 0 && date.getDay() !== 6 && !fullDates.includes(dateStr)) {
         available.push(dateStr);
       }
@@ -1944,7 +2010,7 @@ function TurnosPage({ user, apiFetch }) {
         method: "POST",
         body: JSON.stringify({
           service: descripcion,
-          preferred_date: isUrgente ? new Date().toISOString().split("T")[0] : selectedDate,
+          preferred_date: isUrgente ? (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })() : selectedDate,
           type: isUrgente ? "emergencia" : "normal",
         }),
       });
@@ -2000,10 +2066,10 @@ function TurnosPage({ user, apiFetch }) {
             </>
           )}
           <button
-            onClick={() => { setConfirmed(false); setSelectedDate(null); setDescripcion(""); setUrgencia(""); }}
-            style={{ marginTop: 24, padding: "10px 24px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, color: theme.white, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: "0.88rem", cursor: "pointer" }}
+            onClick={() => navigate("dashboard")}
+            style={{ marginTop: 28, padding: "11px 24px", background: theme.orange, border: "none", borderRadius: 10, color: theme.black, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: "0.9rem", cursor: "pointer" }}
           >
-            Solicitar otro turno
+            Ver mis turnos →
           </button>
         </div>
       </div>
@@ -2021,7 +2087,7 @@ function TurnosPage({ user, apiFetch }) {
       </div>
 
       {/* Info del auto */}
-      {user.autoAsignado && (
+      {user.autoAsignado ? (
         <div className="anim-in d1" style={{ background: theme.gray900, border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: 18, marginBottom: 24, display: "flex", alignItems: "center", gap: 14 }}>
           <div style={{ width: 44, height: 44, borderRadius: 10, background: "rgba(235,136,0,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             <CarIcon size={24} opacity={0.8} />
@@ -2030,6 +2096,13 @@ function TurnosPage({ user, apiFetch }) {
             <div style={{ fontSize: "0.82rem", color: theme.gray400 }}>Vehículo</div>
             <div style={{ fontWeight: 700, fontSize: "0.95rem" }}>{user.autoAsignado.model} · {user.autoAsignado.patente}</div>
           </div>
+        </div>
+      ) : (
+        <div className="anim-in d1" style={{ background: "rgba(235,136,0,0.06)", border: "1px solid rgba(235,136,0,0.2)", borderRadius: 14, padding: 18, marginBottom: 24, display: "flex", alignItems: "center", gap: 12 }}>
+          <AlertIcon size={18} />
+          <p style={{ fontSize: "0.88rem", color: theme.gray300, lineHeight: 1.5 }}>
+            Todavía no tenés un vehículo asignado. Podés igualmente solicitar un turno y el sistema lo vinculará una vez que se te asigne uno.
+          </p>
         </div>
       )}
 
@@ -2086,7 +2159,7 @@ function TurnosPage({ user, apiFetch }) {
         {/* Aviso de urgente */}
         {isUrgente && (
           <div className="anim-in" style={{ background: "rgba(255,68,68,0.08)", border: "1px solid rgba(255,68,68,0.35)", borderRadius: 12, padding: 18, marginBottom: 24 }}>
-            <p style={{ fontSize: "0.9rem", color: "#ff4444", fontWeight: 700, marginBottom: 6 }}>⚠ Atención: turno de emergencia</p>
+            <p style={{ fontSize: "0.9rem", color: "#ff4444", fontWeight: 700, marginBottom: 6, display: "flex", alignItems: "center", gap: 7 }}><AlertIcon size={16} /> Atención: turno de emergencia</p>
             <p style={{ fontSize: "0.84rem", color: theme.gray300, lineHeight: 1.55 }}>
               Esta opción es exclusivamente para fallas graves que <strong style={{ color: theme.white }}>te impiden circular hoy</strong>. No es para adelantar revisiones ni evitar espera.
             </p>
@@ -2105,7 +2178,7 @@ function TurnosPage({ user, apiFetch }) {
 
             {/* Navegación del mes */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <button onClick={() => changeMonth(-1)} style={{ background: "rgba(255,255,255,0.06)", border: "none", color: theme.white, width: 36, height: 36, borderRadius: 8, cursor: "pointer", fontSize: "1.1rem" }}>‹</button>
+              <button onClick={() => changeMonth(-1)} disabled={currentMonth.getFullYear() === new Date().getFullYear() && currentMonth.getMonth() === new Date().getMonth()} style={{ background: "rgba(255,255,255,0.06)", border: "none", color: theme.white, width: 36, height: 36, borderRadius: 8, fontSize: "1.1rem", cursor: (currentMonth.getFullYear() === new Date().getFullYear() && currentMonth.getMonth() === new Date().getMonth()) ? "not-allowed" : "pointer", opacity: (currentMonth.getFullYear() === new Date().getFullYear() && currentMonth.getMonth() === new Date().getMonth()) ? 0.3 : 1 }}>‹</button>
               <span style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.05rem" }}>
                 {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
               </span>
@@ -2155,6 +2228,9 @@ function TurnosPage({ user, apiFetch }) {
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.78rem", color: theme.gray400 }}>
                 <div style={{ width: 12, height: 12, borderRadius: 3, background: "rgba(235,136,0,0.15)", border: "2px solid rgba(235,136,0,0.6)" }} /> Seleccionado
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.78rem", color: theme.gray400 }}>
+                <div style={{ width: 12, height: 12, borderRadius: 3, background: "transparent", border: "1px solid rgba(255,255,255,0.06)" }} /> Sin cupo / no disponible
               </div>
             </div>
 
