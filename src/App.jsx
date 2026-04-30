@@ -12,7 +12,7 @@ import imgNyo037 from "./assets/cars/nyo037.jpg";
 import imgOmb591 from "./assets/cars/omb591.jpg";
 import imgAa865tl from "./assets/cars/aa865tl.jpg";
 
-const GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycbw5R_It5JeU7M1IDK40guHDi4bZM5MXlUk1RR_0j4h9lzdTZIj7hLI5JJm63Ltixc1gLA/exec";
+const GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycbw5hlW0o4hxICmpmGQI4TjHzsgwQZp9B5eqIyC6Im96hUNeqZz9Cr2F1OBRVLIoZ8dxKw/exec";
 // ↑ Reemplazá esto con la URL que te da Google Apps Script al implementar.
 // Ejemplo: "https://script.google.com/macros/s/AKfycbx.../exec"
 
