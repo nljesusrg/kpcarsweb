@@ -19,12 +19,12 @@ jobs:
           node-version: 20
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build project
         run: npm run build
 
-      - name: Deploy to Hostinger
+      - name: Deploy only dist to Hostinger
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
@@ -33,5 +33,8 @@ jobs:
           protocol: ftp
           port: 21
           local-dir: ./dist/
-          server-dir: ./public_html/
+          server-dir: /public_html/
           dangerous-clean-slate: true
+          exclude: |
+            **/.git*
+            **/.git*/**
