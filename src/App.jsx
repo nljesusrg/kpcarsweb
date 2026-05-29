@@ -12,7 +12,7 @@ import imgNyo037 from "./assets/cars/nyo037.jpg";
 import imgOmb591 from "./assets/cars/omb591.jpg";
 import imgAa865tl from "./assets/cars/aa865tl.jpg";
 
-const GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycby_Q3X1IswocHX3faSRvugqTDctV1imzG03vXJ8EQpf-iw3VQ9k1ku4vS-u0GZ1wMRLZQ/exec";
+const GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycby9oZ4hlk8mqZFRtVUWBq2qNGOSYNt5waPRx3L8FyQgGbudK0mkCd1IAQJlfwB_YtK4dQ/exec";
 // ↑ Reemplazá esto con la URL que te da Google Apps Script al implementar.
 // Ejemplo: "https://script.google.com/macros/s/AKfycbx.../exec"
 
@@ -273,12 +273,15 @@ export default function KPCarsApp() {
       localStorage.removeItem("kpcars_user");
       localStorage.removeItem("kpcars_token");
       navigate("login");
-      throw new Error("Sesión expirada. Ingresá de nuevo.");
+      throw new Error("Sesión expirada. Inicia sesión de nuevo.");
     }
     if (res.status === 403) {
-      // Debe cambiar contraseña primero
-      navigate("change-password");
-      throw new Error("Debés cambiar tu contraseña primero.");
+      const currentUser = JSON.parse(localStorage.getItem("kpcars_user") || "null");
+      if (currentUser?.mustChangePassword) {
+        navigate("change-password");
+        throw new Error("Debes cambiar tu contraseña primero.");
+      }
+      throw new Error("No tienes permiso para realizar esta acción.");
     }
     return res;
   };
@@ -327,11 +330,12 @@ export default function KPCarsApp() {
 
       const mapVehiculo = (h) => h.vehiculo ? {
         model: `${h.vehiculo.marca} ${h.vehiculo.modelo}`,
-        variant: "",
+        variant: h.vehiculo.variante || "",
         year: String(h.vehiculo.anio || ""),
         patente: h.vehiculo.patente || "",
         desde: h.fecha_inicio ? new Date(h.fecha_inicio).toLocaleDateString("es-AR") : "",
         hasta: h.fecha_fin ? new Date(h.fecha_fin).toLocaleDateString("es-AR") : null,
+        transmission: h.vehiculo.transmision || "",
       } : null;
 
       const userData = {
@@ -423,10 +427,11 @@ export default function KPCarsApp() {
       const asignacionActual = historialList.find((h) => h.fecha_fin === null);
       const asignacionesAnteriores = historialList.filter((h) => h.fecha_fin !== null);
       const mapVehiculo = (h) => h.vehiculo ? {
-        model: `${h.vehiculo.marca} ${h.vehiculo.modelo}`, variant: "", year: String(h.vehiculo.anio || ""),
+        model: `${h.vehiculo.marca} ${h.vehiculo.modelo}`, variant: h.vehiculo.variante || "", year: String(h.vehiculo.anio || ""),
         patente: h.vehiculo.patente || "",
         desde: h.fecha_inicio ? new Date(h.fecha_inicio).toLocaleDateString("es-AR") : "",
         hasta: h.fecha_fin ? new Date(h.fecha_fin).toLocaleDateString("es-AR") : null,
+        transmission: h.vehiculo.transmision || "",
       } : null;
 
       const updated = {
@@ -478,6 +483,11 @@ export default function KPCarsApp() {
         .d1 { animation-delay: 0.08s; opacity: 0; }
         .d2 { animation-delay: 0.16s; opacity: 0; }
         .d3 { animation-delay: 0.24s; opacity: 0; }
+        @keyframes shimmer { from { background-position: -200% center; } to { background-position: 200% center; } }
+        .skel { background: linear-gradient(90deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.09) 50%, rgba(255,255,255,0.04) 100%); background-size: 200% auto; animation: shimmer 1.6s linear infinite; display: block; border-radius: 6px; }
+        @keyframes ci { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+        .ci { animation: ci 0.5s cubic-bezier(0.22,1,0.36,1) both; }
+        .ci-2 { animation-delay: 0.12s; }
         input:focus, select:focus, textarea:focus { border-color: ${theme.orange} !important; box-shadow: 0 0 0 3px rgba(235,136,0,0.15); outline: none; }
         select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23888' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px !important; }
         select option { background: ${theme.gray800}; color: white; }
@@ -594,93 +604,149 @@ function Nav({ page, navigate, menuOpen, setMenuOpen, user, onLogout }) {
    ───────────────────────────────────────────── */
 function HomePage({ navigate, user }) {
   const stats = [
-    { number: "70+", label: "Choferes activos" },
-    { number: "90+", label: "Vehículos en flota" },
+    { number: "80+", label: "Choferes activos" },
+    { number: "100+", label: "Vehículos en flota" },
     { number: "100%", label: "Flota Toyota" },
     { number: "BA", label: "Buenos Aires" },
   ];
 
   const features = [
-    { icon: <CarIcon size={24} opacity={1} />, title: "Flota 100% Toyota", desc: "Corolla y Etios modelos 2016–2019: vehículos confiables, económicos y con respaldo de la marca más vendida de Argentina." },
-    { icon: <DocumentIcon size={24} />, title: "Papeles al día", desc: "Seguro, VTV, y toda la documentación necesaria para que manejes tranquilo y sin preocupaciones legales." },
-    { icon: <WrenchIcon size={24} />, title: "Taller propio", desc: "Contamos con taller propio donde hacemos todo tipo de mantenimiento y service. No dependes de terceros." },
-    { icon: <CoinIcon size={24} />, title: "Alquiler semanal", desc: "Pago semanal fijo. Sabes exactamente cuánto pagas cada semana, sin sorpresas ni costos ocultos." },
-    { icon: <SmartphoneIcon size={24} />, title: "Trabaja donde quieras", desc: "Uber, Didi, Cabify, particular o cualquier empresa de transporte. Sin restricciones de plataforma." },
-    { icon: <UsersIcon size={24} />, title: "Acompañamiento", desc: "Te ayudamos con el proceso de alta en las aplicaciones y te damos soporte continuo mientras trabajas." },
+    { icon: <CarIcon size={22} opacity={1} />, title: "Flota 100% Toyota", desc: "Corolla y Etios modelos 2016–2019: vehículos confiables, económicos y con respaldo de la marca más vendida de Argentina." },
+    { icon: <DocumentIcon size={22} />, title: "Papeles al día", desc: "Seguro, VTV, y toda la documentación necesaria para que manejes tranquilo y sin preocupaciones legales." },
+    { icon: <WrenchIcon size={22} />, title: "Taller propio", desc: "Contamos con taller propio donde hacemos todo tipo de mantenimiento y service. No dependes de terceros." },
+    { icon: <CoinIcon size={22} />, title: "Alquiler semanal", desc: "Pago semanal fijo. Sabes exactamente cuánto pagas cada semana, sin sorpresas ni costos ocultos." },
+    { icon: <SmartphoneIcon size={22} />, title: "Trabaja donde quieras", desc: "Uber, Didi, Cabify, particular o cualquier empresa de transporte. Sin restricciones de plataforma." },
+    { icon: <UsersIcon size={22} />, title: "Acompañamiento real", desc: "Te ayudamos con el proceso de alta en las aplicaciones y te damos soporte continuo mientras trabajas." },
+  ];
+
+  const steps = [
+    { n: "01", title: "Completa el formulario", desc: "Cuéntanos un poco sobre ti. El proceso es rápido y sin burocracia." },
+    { n: "02", title: "Agendamos una entrevista", desc: "Te contactamos para coordinar una reunión presencial con nuestro equipo." },
+    { n: "03", title: "Comienza a manejar", desc: "Tras la entrevista coordinamos la entrega del vehículo y ya estás listo para generar ingresos." },
   ];
 
   return (
     <div>
-      {/* Hero */}
+      <style>{`
+        @media (max-width: 640px) {
+          .hero-grid { grid-template-columns: 1fr !important; }
+          .steps-grid { grid-template-columns: 1fr !important; }
+          .features-grid { grid-template-columns: 1fr !important; }
+        }
+        @media (max-width: 900px) {
+          .features-grid { grid-template-columns: repeat(2, 1fr) !important; }
+        }
+      `}</style>
+
+      {/* ── Hero ── */}
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", paddingTop: 64, position: "relative", overflow: "hidden" }}>
-        <div style={{ position: "absolute", top: "-30%", right: "-15%", width: 600, height: 600, background: "radial-gradient(circle, rgba(235,136,0,0.1) 0%, transparent 70%)", pointerEvents: "none" }} />
-        {/* Logo grande decorativo de fondo */}
-        <img src={kpLogo} alt="" style={{ position: "absolute", right: "-5%", top: "50%", transform: "translateY(-50%)", height: "70vh", opacity: 0.04, pointerEvents: "none" }} />
-        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "40px 20px", width: "100%" }}>
-          <img className="anim-in" src={kpLogo} alt="KPCars" style={{ height: 90, marginBottom: 24 }} />
-          <h1 className="anim-in d1" style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "clamp(2.2rem, 8vw, 4rem)", lineHeight: 1.05, letterSpacing: -1.5, marginBottom: 18 }}>
-            Tu auto para{" "}<span style={{ color: theme.orange }}>generar ingresos</span>{" "}ya está listo
+        {/* Gradientes de fondo */}
+        <div style={{ position: "absolute", top: "-20%", right: "-10%", width: 700, height: 700, background: "radial-gradient(circle, rgba(235,136,0,0.09) 0%, transparent 65%)", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", bottom: "-10%", left: "-10%", width: 500, height: 500, background: "radial-gradient(circle, rgba(235,136,0,0.05) 0%, transparent 65%)", pointerEvents: "none" }} />
+        {/* Logo decorativo */}
+        <img src={kpLogo} alt="" style={{ position: "absolute", right: "-4%", top: "50%", transform: "translateY(-50%)", height: "75vh", opacity: 0.035, pointerEvents: "none", userSelect: "none" }} />
+
+        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "60px 20px", width: "100%" }}>
+          {/* Badge */}
+          <div className="anim-in" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 14px", background: "rgba(235,136,0,0.1)", border: "1px solid rgba(235,136,0,0.25)", borderRadius: 100, marginBottom: 28 }}>
+            <span style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: 2, color: theme.orange, textTransform: "uppercase" }}>Alquiler de vehículos · Buenos Aires</span>
+          </div>
+
+          {/* Titular */}
+          <h1 className="anim-in d1" style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "clamp(2.6rem, 8vw, 5rem)", lineHeight: 1.0, letterSpacing: -2, marginBottom: 22, maxWidth: 720 }}>
+            Alquila un auto.<br />
+            <span style={{ color: theme.orange }}>Genera ingresos</span><br />
+            desde el día uno.
           </h1>
-          <p className="anim-in d2" style={{ fontSize: "1.05rem", color: theme.gray300, lineHeight: 1.6, marginBottom: 32, maxWidth: 520 }}>
-            Alquila un Toyota y trabaja en Uber, Didi, Cabify o con la empresa que quieras. Tú pones las ganas, nosotros ponemos el vehículo.
+
+          <p className="anim-in d2" style={{ fontSize: "1.05rem", color: theme.gray300, lineHeight: 1.65, marginBottom: 36, maxWidth: 480 }}>
+            Alquila uno de nuestros vehículos y trabaja en Uber, Didi, Cabify o donde quieras. Tú pones las ganas, nosotros ponemos el auto.
           </p>
-          <div className="anim-in d3" style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+
+          <div className="anim-in d3" style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 72 }}>
             <Btn onClick={() => navigate("catalog")}>Ver flota →</Btn>
             {!user && <Btn variant="secondary" onClick={() => navigate("apply")}>Quiero manejar</Btn>}
+          </div>
+
+          {/* Stats en línea */}
+          <div className="anim-in d3" style={{ display: "flex", gap: 0, flexWrap: "wrap", borderTop: "1px solid rgba(255,255,255,0.07)", paddingTop: 32 }}>
+            {stats.map((s, i) => (
+              <div key={i} style={{ paddingRight: 40, marginRight: 40, borderRight: i < stats.length - 1 ? "1px solid rgba(255,255,255,0.07)" : "none", paddingBottom: 8 }}>
+                <div style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "clamp(1.6rem, 3vw, 2.2rem)", color: theme.white, lineHeight: 1 }}>{s.number}</div>
+                <div style={{ fontSize: "0.75rem", color: theme.gray500, fontWeight: 500, marginTop: 4, letterSpacing: 0.5 }}>{s.label}</div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Stats */}
-      <div style={{ maxWidth: 1200, margin: "0 auto 60px", padding: "0 20px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 1, background: "rgba(255,255,255,0.06)", borderRadius: 12, overflow: "hidden" }}>
-          {stats.map((s, i) => (
-            <div key={i} style={{ background: theme.gray900, padding: "28px 20px", textAlign: "center" }}>
-              <div style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "2rem", color: theme.orange, marginBottom: 4 }}>{s.number}</div>
-              <div style={{ fontSize: "0.8rem", color: theme.gray400, fontWeight: 500 }}>{s.label}</div>
+      {/* ── Cómo funciona ── */}
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "80px 20px" }}>
+        <div style={{ marginBottom: 52 }}>
+          <SectionLabel>El proceso</SectionLabel>
+          <SectionTitle>Tres pasos para<br />estar en la calle</SectionTitle>
+        </div>
+        <div className="steps-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2, background: "rgba(255,255,255,0.05)", borderRadius: 20, overflow: "hidden" }}>
+          {steps.map((s, i) => (
+            <div key={i} style={{ background: theme.black, padding: "36px 32px", position: "relative" }}>
+              <div style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "3.5rem", color: "rgba(235,136,0,0.12)", lineHeight: 1, marginBottom: 20, letterSpacing: -2 }}>{s.n}</div>
+              <h3 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.1rem", marginBottom: 10, color: theme.white }}>{s.title}</h3>
+              <p style={{ fontSize: "0.88rem", color: theme.gray400, lineHeight: 1.65 }}>{s.desc}</p>
+              {i < steps.length - 1 && (
+                <div style={{ position: "absolute", top: "50%", right: -12, transform: "translateY(-50%)", width: 24, height: 24, background: theme.black, border: "1px solid rgba(255,255,255,0.08)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1 }}>
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M3 2l4 3-4 3" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </div>
+              )}
             </div>
           ))}
         </div>
       </div>
 
-      {/* Toyota badge */}
-      <div style={{ maxWidth: 1200, margin: "0 auto 40px", padding: "0 20px", display: "flex", alignItems: "center", justifyContent: "center", gap: 14 }}>
-        <div style={{ height: 1, flex: 1, background: "rgba(255,255,255,0.06)" }} />
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 20px", background: theme.gray900, borderRadius: 100, border: "1px solid rgba(255,255,255,0.06)" }}>
-          <img src={toyotaLogo} alt="Toyota" style={{ height: 22 }} />
-          <span style={{ fontSize: "0.8rem", color: theme.gray400, fontWeight: 500 }}>Flota 100% Toyota</span>
-        </div>
-        <div style={{ height: 1, flex: 1, background: "rgba(255,255,255,0.06)" }} />
-      </div>
-
-      {/* Features */}
+      {/* ── Por qué KPCars ── */}
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "40px 20px 80px" }}>
-        <SectionLabel>Por qué KPCars</SectionLabel>
-        <SectionTitle>Todo lo que necesitás<br />para empezar a manejar</SectionTitle>
-        <p style={{ fontSize: "1rem", color: theme.gray400, maxWidth: 520, lineHeight: 1.6, marginBottom: 48 }}>
-          Nos encargamos de que tengas un auto en condiciones, con papeles al día y listo para que empieces a generar ingresos desde el día uno.
-        </p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 20, marginBottom: 48 }}>
+          <div>
+            <SectionLabel>Por qué KPCars</SectionLabel>
+            <SectionTitle>Todo lo que necesitas<br />para empezar</SectionTitle>
+          </div>
+          <p style={{ fontSize: "0.92rem", color: theme.gray400, maxWidth: 360, lineHeight: 1.65 }}>
+            Nos encargamos de que tengas un auto en condiciones, con papeles al día y listo para generar ingresos desde el día uno.
+          </p>
+        </div>
+        <div className="features-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, background: "rgba(255,255,255,0.05)", borderRadius: 20, overflow: "hidden" }}>
           {features.map((f, i) => (
-            <div key={i} style={{ background: theme.gray900, border: "1px solid rgba(255,255,255,0.05)", borderRadius: 12, padding: "28px 24px" }}>
-              <div style={{ width: 44, height: 44, background: "rgba(235,136,0,0.1)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 16, color: theme.orange }}>{f.icon}</div>
-              <h3 style={{ fontSize: "1.05rem", fontWeight: 700, marginBottom: 6 }}>{f.title}</h3>
-              <p style={{ fontSize: "0.88rem", color: theme.gray400, lineHeight: 1.6 }}>{f.desc}</p>
+            <div key={i} style={{ background: theme.black, padding: "32px 28px", borderLeft: i % 3 === 0 ? "none" : "none", position: "relative" }}>
+              <div style={{ width: 42, height: 42, background: "rgba(235,136,0,0.1)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 18, color: theme.orange }}>{f.icon}</div>
+              <h3 style={{ fontSize: "0.98rem", fontWeight: 700, marginBottom: 8, color: theme.white }}>{f.title}</h3>
+              <p style={{ fontSize: "0.84rem", color: theme.gray400, lineHeight: 1.65 }}>{f.desc}</p>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Platforms */}
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "40px 20px 80px", textAlign: "center" }}>
-        <SectionLabel>Plataformas compatibles</SectionLabel>
-        <SectionTitle>Maneja donde quieras</SectionTitle>
-        <p style={{ fontSize: "0.95rem", color: theme.gray400, maxWidth: 480, margin: "0 auto 36px", lineHeight: 1.6 }}>
-          Nuestros autos están habilitados para todas las plataformas de transporte. También puedes trabajar particular o con cualquier empresa.
-        </p>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 36, flexWrap: "wrap", opacity: 0.45 }}>
-          {["Uber", "Didi", "Cabify", "+ más"].map((a) => (
-            <span key={a} style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.4rem", letterSpacing: -0.5, color: theme.gray300 }}>{a}</span>
+      {/* ── Plataformas ── */}
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "40px 20px 100px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16, marginBottom: 36 }}>
+          <div>
+            <SectionLabel>Plataformas compatibles</SectionLabel>
+            <SectionTitle>Trabaja donde quieras</SectionTitle>
+          </div>
+          <p style={{ fontSize: "0.92rem", color: theme.gray400, maxWidth: 340, lineHeight: 1.65 }}>
+            Nuestros autos están habilitados para todas las plataformas de transporte. Sin restricciones.
+          </p>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+          {[
+            { name: "Uber",   color: "#ffffff", bg: "rgba(255,255,255,0.04)", border: "rgba(255,255,255,0.1)",  desc: "La plataforma más usada en Argentina" },
+            { name: "Didi",   color: "#ff6633", bg: "rgba(255,102,51,0.06)",  border: "rgba(255,102,51,0.18)", desc: "Con alta demanda en el AMBA" },
+            { name: "Cabify", color: "#9b59b6", bg: "rgba(155,89,182,0.06)", border: "rgba(155,89,182,0.18)", desc: "Servicio premium con pasajeros frecuentes" },
+            { name: "Particular y más", color: theme.orange, bg: "rgba(235,136,0,0.06)", border: "rgba(235,136,0,0.2)", desc: "Trabajá sin plataforma o con la que elijas" },
+          ].map((p) => (
+            <div key={p.name} style={{ background: p.bg, border: `1px solid ${p.border}`, borderRadius: 16, padding: "28px 24px", display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.1rem", color: p.color, letterSpacing: -0.5, marginBottom: 2 }}>{p.name}</div>
+              <div style={{ fontSize: "0.8rem", color: theme.gray400, lineHeight: 1.55 }}>{p.desc}</div>
+            </div>
           ))}
         </div>
       </div>
@@ -1165,7 +1231,7 @@ function LoginPage({ onLogin }) {
 
   const handleSubmit = async () => {
     if (!dni || !password) {
-      setError("Ingresá tu DNI y contraseña.");
+      setError("Ingresa tu DNI y contraseña.");
       return;
     }
     setError("");
@@ -1199,7 +1265,7 @@ function LoginPage({ onLogin }) {
       });
 
     } catch (err) {
-      setError("Error de conexión. Verificá tu internet e intentá de nuevo.");
+      setError("Error de conexión. Verifica tu internet e intenta de nuevo.");
       setLoading(false);
     }
   };
@@ -1289,42 +1355,111 @@ function LoginPage({ onLogin }) {
   );
 }
 
+/* ── Banner de vencimientos próximos ── */
+function VencimientosBanner({ user }) {
+  const alerts = [];
+
+  if (user.licenciaVencimiento) {
+    const exp = new Date(user.licenciaVencimiento + "T12:00:00");
+    const days = Math.ceil((exp - new Date()) / 86400000);
+    if (days <= 30) alerts.push({ label: "Licencia de conducir", days });
+  }
+
+  if (alerts.length === 0) return null;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 24 }}>
+      {alerts.map((a, i) => {
+        const urgent = a.days <= 7;
+        const expired = a.days <= 0;
+        const color = urgent ? "#ff5252" : theme.orange;
+        const bg    = urgent ? "rgba(255,82,82,0.08)"   : "rgba(235,136,0,0.08)";
+        const bdr   = urgent ? "rgba(255,82,82,0.22)"   : "rgba(235,136,0,0.22)";
+        return (
+          <div key={i} className="anim-in" style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 18px", background: bg, border: `1px solid ${bdr}`, borderRadius: 14 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+              <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <p style={{ fontSize: "0.83rem", fontWeight: 600, color, margin: 0 }}>
+              {expired
+                ? `Tu ${a.label} está vencida.`
+                : `Tu ${a.label} vence en ${a.days} día${a.days !== 1 ? "s" : ""}.`}
+              <span style={{ fontWeight: 400, color: theme.gray400, marginLeft: 6 }}>
+                {expired ? "Renovarla lo antes posible." : "Recuerda renovarla a tiempo."}
+              </span>
+            </p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /* ─────────────────────────────────────────────
    DASHBOARD PAGE (PANEL DEL CONDUCTOR)
    ───────────────────────────────────────────── */
 function DashboardPage({ user, navigate, apiFetch, onUserUpdate }) {
   const [tab, setTab] = useState("perfil");
 
-  const tabStyle = (active) => ({
-    padding: "10px 20px",
-    borderRadius: 8,
-    fontSize: "0.88rem",
-    fontWeight: 600,
-    fontFamily: "'DM Sans', sans-serif",
-    cursor: "pointer",
-    border: "none",
-    background: active ? theme.orange : "rgba(255,255,255,0.06)",
-    color: active ? theme.black : theme.gray300,
-  });
-
   return (
     <div style={{ paddingTop: 84, maxWidth: 900, margin: "0 auto", padding: "84px 20px 80px" }}>
-      <div className="anim-in" style={{ marginBottom: 32 }}>
-        <SectionLabel>Panel del conductor</SectionLabel>
-        <SectionTitle>Hola, {user.nombre || "Conductor"}</SectionTitle>
+
+      {/* Header: saludo + tabs en la misma fila */}
+      <div className="anim-in dash-header" style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 20, marginBottom: 36 }}>
+        <div>
+          <p style={{ fontSize: "0.68rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: 3, color: theme.orange, marginBottom: 6 }}>Panel del conductor</p>
+          <h1 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "clamp(1.8rem, 5vw, 2.8rem)", letterSpacing: -1, lineHeight: 1.05 }}>
+            Hola, <span style={{ color: theme.orange }}>{user.nombre || "Conductor"}</span>
+          </h1>
+        </div>
+
+        {/* Botones de tab */}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", flexShrink: 0 }}>
+          <button
+            onClick={() => setTab("perfil")}
+            style={{ display: "flex", alignItems: "center", gap: 7, padding: "10px 18px", borderRadius: 10, fontSize: "0.88rem", fontWeight: 600, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", border: "none", background: tab === "perfil" ? theme.orange : "rgba(255,255,255,0.06)", color: tab === "perfil" ? theme.black : theme.gray300, transition: "background 0.15s" }}
+          >
+            <UserIcon size={15} /> Mi Perfil
+          </button>
+          <button
+            onClick={() => setTab("turnos")}
+            style={{ display: "flex", alignItems: "center", gap: 7, padding: "10px 18px", borderRadius: 10, fontSize: "0.88rem", fontWeight: 600, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", border: "none", background: tab === "turnos" ? theme.orange : "rgba(255,255,255,0.06)", color: tab === "turnos" ? theme.black : theme.gray300, transition: "background 0.15s" }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+            Mis Turnos
+          </button>
+          <button
+            onClick={() => navigate("turnos")}
+            style={{ display: "flex", alignItems: "center", gap: 7, padding: "10px 18px", borderRadius: 10, fontSize: "0.88rem", fontWeight: 700, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", border: "none", background: theme.orange, color: theme.black }}
+          >
+            + Solicitar turno
+          </button>
+        </div>
       </div>
 
-      <div className="dash-tabs">
-        <button style={tabStyle(tab === "perfil")} onClick={() => setTab("perfil")}>Mi Perfil</button>
-        <button style={tabStyle(tab === "turnos")} onClick={() => setTab("turnos")}>Mis Turnos</button>
-        <button style={tabStyle(false)} onClick={() => navigate("turnos")}>+ Solicitar turno</button>
-      </div>
+      <style>{`
+        @media (max-width: 640px) {
+          .dash-header { flex-direction: column !important; }
+          .dash-header > div:last-child { width: 100%; }
+          .dash-header > div:last-child button { flex: 1 1 auto; justify-content: center; }
+        }
+      `}</style>
+
+      <VencimientosBanner user={user} />
 
       {tab === "perfil" && <ProfileTab user={user} apiFetch={apiFetch} onUpdate={onUserUpdate} />}
       {tab === "turnos" && <TurnosTab user={user} apiFetch={apiFetch} navigate={navigate} />}
     </div>
   );
 }
+
+/* ── Skeleton helper ── */
+const Skel = ({ w = "100%", h = 14, r = 6, mb = 0 }) => (
+  <span className="skel" style={{ width: w, height: h, borderRadius: r, marginBottom: mb || undefined, display: "block" }} />
+);
 
 /* ── Perfil del conductor ── */
 function ProfileTab({ user, apiFetch, onUpdate }) {
@@ -1334,6 +1469,9 @@ function ProfileTab({ user, apiFetch, onUpdate }) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [saveOk, setSaveOk] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [focusTarget, setFocusTarget] = useState(null);
+  const firstSyncDone = useRef(false);
 
   const syncMe = async () => {
     try {
@@ -1353,7 +1491,12 @@ function ProfileTab({ user, apiFetch, onUpdate }) {
         setEmail(updated.email || "");
         setTelefono(updated.telefono || "");
       }
-    } catch {}
+    } catch {} finally {
+      if (!firstSyncDone.current) {
+        firstSyncDone.current = true;
+        setLoadingProfile(false);
+      }
+    }
   };
 
   useEffect(() => {
@@ -1401,137 +1544,189 @@ function ProfileTab({ user, apiFetch, onUpdate }) {
     setTelefono(user.telefono || "");
     setSaveError("");
     setEditing(false);
+    setFocusTarget(null);
   };
 
-  const fieldStyle = { marginBottom: 20 };
-  const labelStyle = { fontSize: "0.78rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1.5, color: theme.gray400, marginBottom: 5, display: "block" };
-  const valueStyle = { fontSize: "1rem", color: theme.white, fontWeight: 500 };
-  const inputStyle = { width: "100%", padding: "9px 12px", background: theme.gray800, border: `1px solid rgba(255,255,255,0.12)`, borderRadius: 8, color: theme.white, fontFamily: "'DM Sans', sans-serif", fontSize: "0.95rem" };
+  const inputS = { padding: "6px 10px", background: theme.gray700, border: "1px solid rgba(255,255,255,0.12)", borderRadius: 7, color: theme.white, fontFamily: "'DM Sans', sans-serif", fontSize: "0.88rem", width: "100%", maxWidth: 190 };
+  const fmtDNI = (v) => String(v).replace(/\D/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+
+  const cardBase = { background: theme.gray900, border: "1px solid rgba(255,255,255,0.07)", borderRadius: 20, padding: 24 };
+
+  if (loadingProfile) return (
+    <div>
+      <div className="profile-cards-grid" style={{ display: "grid", gap: 20 }}>
+        <style>{`.profile-cards-grid { grid-template-columns: 300px 1fr; } @media (max-width: 720px) { .profile-cards-grid { grid-template-columns: 1fr; } }`}</style>
+
+        {/* Skeleton izquierda */}
+        <div style={{ ...cardBase, display: "flex", flexDirection: "column" }}>
+          <Skel w={80} h={10} mb={22} />
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 22, gap: 10 }}>
+            <Skel w={88} h={88} r={20} mb={4} />
+            <Skel w={120} h={14} />
+            <Skel w={60} h={9} />
+          </div>
+          <div style={{ borderTop: "1px dashed rgba(255,255,255,0.1)", marginBottom: 20 }} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 18, flex: 1 }}>
+            {[100, 85, 95, 75].map((w, i) => <Skel key={i} w={`${w}%`} h={12} />)}
+          </div>
+          <Skel w="100%" h={42} r={12} mb={0} style={{ marginTop: 28 }} />
+        </div>
+
+        {/* Skeleton derecha */}
+        <div style={{ ...cardBase, display: "flex", flexDirection: "column", gap: 16 }}>
+          <Skel w={110} h={10} />
+          <Skel w={180} h={28} r={8} />
+          <Skel w={120} h={12} />
+          <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", margin: "4px 0" }} />
+          <Skel w={70} h={9} />
+          <Skel w="60%" h={36} r={8} />
+          <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", margin: "4px 0" }} />
+          <div style={{ display: "flex", gap: 16 }}>
+            {[1,2,3].map(i => (
+              <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+                <Skel w="60%" h={9} />
+                <Skel w="80%" h={12} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="anim-in">
-      <div style={{ display: "grid", gap: 24 }} className="profile-grid">
-        <style>{`
-          .profile-grid { grid-template-columns: 200px 1fr; }
-          @media (max-width: 600px) { .profile-grid { grid-template-columns: 1fr; } }
-        `}</style>
+      <div className="profile-cards-grid" style={{ display: "grid", gap: 20 }}>
+        <style>{`.profile-cards-grid { grid-template-columns: 300px 1fr; } @media (max-width: 720px) { .profile-cards-grid { grid-template-columns: 1fr; } }`}</style>
 
-        {/* Foto */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 160, height: 160, borderRadius: 16, background: theme.gray800, border: "2px solid rgba(255,255,255,0.08)", overflow: "hidden" }}>
-            <ProfileAvatar user={user} size={160} />
+        {/* ── Tarjeta izquierda: conductor ── */}
+        <div className="ci" style={{ background: theme.gray900, border: "1px solid rgba(255,255,255,0.07)", borderRadius: 20, padding: 24, display: "flex", flexDirection: "column" }}>
+
+          {/* ID */}
+          <div style={{ marginBottom: 22 }}>
+            <span style={{ fontSize: "0.7rem", color: theme.gray400, letterSpacing: 1.5, fontWeight: 500 }}>
+              ID · {user.dni || "—"}
+            </span>
           </div>
-        </div>
 
-        {/* Datos */}
-        <div style={{ background: theme.gray900, border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: "clamp(20px, 4vw, 32px)" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 24px" }} className="profile-fields">
-            <style>{`@media (max-width: 500px) { .profile-fields { grid-template-columns: 1fr !important; } }`}</style>
-            <div style={fieldStyle}>
-              <span style={labelStyle}>Nombre</span>
-              <span style={valueStyle}>{user.nombre}</span>
+          {/* Avatar + nombre + rol */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 22 }}>
+            <div style={{ width: 88, height: 88, borderRadius: 20, background: "linear-gradient(145deg, rgba(235,136,0,0.28), rgba(235,136,0,0.1))", border: "2px solid rgba(235,136,0,0.2)", overflow: "hidden", marginBottom: 14 }}>
+              <ProfileAvatar user={user} size={88} />
             </div>
-            <div style={fieldStyle}>
-              <span style={labelStyle}>Apellido</span>
-              <span style={valueStyle}>{user.apellido}</span>
+            <div style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.15rem", color: theme.white, marginBottom: 4, textAlign: "center" }}>
+              {`${user.nombre || ""} ${user.apellido || ""}`.trim() || "Conductor"}
             </div>
-            <div style={fieldStyle}>
-              <span style={labelStyle}>DNI</span>
-              <span style={valueStyle}>{user.dni}</span>
+            <div style={{ fontSize: "0.65rem", fontWeight: 700, letterSpacing: 3, color: theme.orange, textTransform: "uppercase" }}>
+              {user.role === "administrador" ? "Administrador" : "Conductor"}
             </div>
-            <div style={fieldStyle}>
-              <span style={labelStyle}>Vencimiento licencia</span>
-              <span style={valueStyle}>
-                {user.licenciaVencimiento
+          </div>
+
+          {/* Separador punteado */}
+          <div style={{ borderTop: "1px dashed rgba(255,255,255,0.1)", marginBottom: 20 }} />
+
+          {/* Campos */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 16, flex: 1 }}>
+            {[
+              {
+                icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>,
+                label: "DNI",
+                display: user.dni ? fmtDNI(user.dni) : "—",
+              },
+              {
+                icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.7 10.81 19.79 19.79 0 01.67 2.18 2 2 0 012.65 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 7.91a16 16 0 006.72 6.72l.91-.91a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>,
+                label: "TELÉFONO",
+                fieldKey: "telefono",
+                display: editing ? null : (user.telefono || null),
+                editEl: editing ? <input autoFocus={focusTarget === "telefono"} style={inputS} type="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="+54 9 11 …" /> : null,
+                canAdd: true,
+              },
+              {
+                icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>,
+                label: "EMAIL",
+                fieldKey: "email",
+                display: editing ? null : (user.email || null),
+                editEl: editing ? <input autoFocus={focusTarget === "email"} style={inputS} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="tu@correo.com" /> : null,
+                canAdd: true,
+              },
+              {
+                icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
+                label: "VENCIM. LICENCIA",
+                display: user.licenciaVencimiento
                   ? new Date(user.licenciaVencimiento + "T12:00:00").toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" })
-                  : "—"}
-              </span>
-            </div>
-
-            {/* Email editable */}
-            <div style={fieldStyle}>
-              <span style={labelStyle}>Email</span>
-              {editing ? (
-                <input style={inputStyle} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="tu@correo.com" />
-              ) : (
-                <span style={valueStyle}>{user.email || <span style={{ color: theme.gray400 }}>Sin especificar</span>}</span>
-              )}
-            </div>
-
-            {/* Teléfono editable */}
-            <div style={fieldStyle}>
-              <span style={labelStyle}>Teléfono</span>
-              {editing ? (
-                <input style={inputStyle} type="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="+54 9 11 1234-5678" />
-              ) : (
-                <span style={valueStyle}>{user.telefono || <span style={{ color: theme.gray400 }}>Sin especificar</span>}</span>
-              )}
-            </div>
+                  : "—",
+              },
+            ].map((f, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, animation: `ci 0.45s cubic-bezier(0.22,1,0.36,1) ${0.06 * i + 0.18}s both`, opacity: 0 }}>
+                <span style={{ color: theme.gray400, flexShrink: 0, display: "flex" }}>{f.icon}</span>
+                <span style={{ fontSize: "0.67rem", fontWeight: 700, letterSpacing: 1.5, color: theme.gray400, textTransform: "uppercase", flexShrink: 0 }}>{f.label}</span>
+                <div style={{ flex: 1, textAlign: "right" }}>
+                  {f.editEl || (
+                    f.display && f.display !== null
+                      ? <span style={{ fontSize: "0.9rem", fontWeight: 600, color: f.display === "—" ? theme.gray600 : theme.white }}>{f.display}</span>
+                      : f.canAdd
+                        ? <button onClick={() => { setEditing(true); setSaveOk(false); setFocusTarget(f.fieldKey); }} style={{ background: "none", border: "none", padding: 0, fontSize: "0.85rem", color: theme.orange, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>+ Agregar</button>
+                        : null
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
 
           {/* Acciones */}
-          {saveOk && !editing && (
-            <div style={{ fontSize: "0.82rem", color: "#4caf50", marginBottom: 12 }}>Datos actualizados correctamente.</div>
-          )}
-          {saveError && (
-            <div style={{ fontSize: "0.82rem", color: "#ff6b6b", marginBottom: 12 }}>{saveError}</div>
-          )}
-          {editing ? (
-            <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
-              <button onClick={handleCancel} disabled={saving} style={{ flex: 1, padding: "10px 0", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, color: theme.white, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: "0.88rem", cursor: "pointer" }}>
-                Cancelar
-              </button>
-              <button onClick={handleSave} disabled={saving} style={{ flex: 1, padding: "10px 0", background: theme.orange, border: "none", borderRadius: 10, color: theme.black, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: "0.88rem", cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}>
-                {saving ? "Guardando…" : "Guardar cambios"}
-              </button>
-            </div>
-          ) : (
-            <button onClick={() => { setEditing(true); setSaveOk(false); }} style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 16px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, color: theme.gray300, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}>
-              <PencilIcon size={15} /> Editar contacto
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Auto asignado actual */}
-      {user.autoAsignado && (
-        <div style={{ marginTop: 28, background: theme.gray900, border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: "clamp(20px, 4vw, 32px)" }}>
-          <p style={{ fontSize: "0.78rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: theme.orange, marginBottom: 16 }}>Vehículo actual</p>
-          <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-            <div style={{ width: 56, height: 56, borderRadius: 12, background: "rgba(235,136,0,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <CarIcon size={32} opacity={0.8} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.1rem" }}>{user.autoAsignado.model}</div>
-              <div style={{ fontSize: "0.85rem", color: theme.gray400 }}>{user.autoAsignado.variant} · {user.autoAsignado.year}</div>
-              <div style={{ fontSize: "0.88rem", color: theme.orange, fontWeight: 700, marginTop: 4 }}>Patente: {user.autoAsignado.patente}</div>
-            </div>
-            {user.autoAsignado.desde && (
-              <div style={{ background: "rgba(235,136,0,0.08)", padding: "6px 14px", borderRadius: 8, fontSize: "0.78rem", color: theme.orange, fontWeight: 600 }}>
-                Desde {user.autoAsignado.desde}
+          <div style={{ marginTop: 24 }}>
+            {saveOk && !editing && <p style={{ fontSize: "0.78rem", color: "#4caf50", marginBottom: 10, textAlign: "center" }}>Cambios guardados ✓</p>}
+            {saveError && <p style={{ fontSize: "0.78rem", color: "#ff6b6b", marginBottom: 10 }}>{saveError}</p>}
+            {editing ? (
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={handleCancel} disabled={saving}
+                  style={{ flex: 1, padding: "10px 0", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, color: theme.white, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}>
+                  Cancelar
+                </button>
+                <button onClick={handleSave} disabled={saving}
+                  style={{ flex: 1, padding: "10px 0", background: theme.orange, border: "none", borderRadius: 10, color: theme.black, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: "0.85rem", cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}>
+                  {saving ? "Guardando…" : "Guardar"}
+                </button>
               </div>
+            ) : (
+              <button onClick={() => { setEditing(true); setSaveOk(false); }}
+                style={{ width: "100%", padding: "11px 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, color: theme.gray300, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: "0.87rem", cursor: "pointer" }}>
+                <PencilIcon size={14} /> Editar información personal
+              </button>
             )}
           </div>
         </div>
-      )}
 
-      {/* Historial de autos anteriores */}
+        {/* ── Tarjeta derecha: vehículo ── */}
+        {user.autoAsignado ? (
+          <VehicleCard auto={user.autoAsignado} />
+        ) : (
+          <div className="ci ci-2" style={{ background: theme.gray900, border: "1px solid rgba(255,255,255,0.07)", borderRadius: 20, padding: 32, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, textAlign: "center", minHeight: 220 }}>
+            <div style={{ width: 60, height: 60, borderRadius: 14, background: "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <CarIcon size={32} opacity={0.25} />
+            </div>
+            <p style={{ color: theme.gray400, fontSize: "0.9rem", lineHeight: 1.6 }}>Todavía no tienes<br />un vehículo asignado.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Historial */}
       {user.historialAutos && user.historialAutos.length > 0 && (
-        <div style={{ marginTop: 16, background: theme.gray900, border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: "clamp(20px, 4vw, 32px)" }}>
-          <p style={{ fontSize: "0.78rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: theme.gray400, marginBottom: 16 }}>Vehículos anteriores</p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ marginTop: 20, background: theme.gray900, border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: "clamp(20px, 4vw, 28px)" }}>
+          <p style={{ fontSize: "0.68rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: 2.5, color: theme.gray400, marginBottom: 14 }}>Vehículos anteriores</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {user.historialAutos.map((auto, i) => (
               <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, padding: 14, background: "rgba(255,255,255,0.02)", borderRadius: 12, border: "1px solid rgba(255,255,255,0.04)" }}>
-                <div style={{ width: 40, height: 40, borderRadius: 10, background: "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  <CarIcon size={22} opacity={0.3} />
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <CarIcon size={20} opacity={0.3} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: "0.92rem", fontWeight: 600 }}>{auto.model}</div>
-                  <div style={{ fontSize: "0.8rem", color: theme.gray400 }}>{auto.variant} · {auto.year} · <span style={{ color: theme.gray300 }}>{auto.patente}</span></div>
+                  <div style={{ fontSize: "0.9rem", fontWeight: 600 }}>{auto.model}</div>
+                  <div style={{ fontSize: "0.78rem", color: theme.gray400 }}>{auto.patente}</div>
                 </div>
                 <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontSize: "0.72rem", color: theme.gray400, lineHeight: 1.5 }}>Desde {auto.desde}</div>
-                  {auto.hasta && <div style={{ fontSize: "0.72rem", color: theme.gray400, lineHeight: 1.5 }}>al {auto.hasta}</div>}
+                  <div style={{ fontSize: "0.7rem", color: theme.gray400, lineHeight: 1.5 }}>Desde {auto.desde}</div>
+                  {auto.hasta && <div style={{ fontSize: "0.7rem", color: theme.gray400 }}>al {auto.hasta}</div>}
                 </div>
               </div>
             ))}
@@ -1539,6 +1734,89 @@ function ProfileTab({ user, apiFetch, onUpdate }) {
         </div>
       )}
     </div>
+  );
+}
+
+/* ── Tarjeta de vehículo ── */
+function VehicleCard({ auto }) {
+  const words = (auto.model || "").split(" ");
+  const marca = words[0] || "";
+  const modelo = words.slice(1).join(" ");
+
+  return (
+    <div className="ci ci-2" style={{ background: "linear-gradient(145deg, #1c1c1c 0%, #161616 100%)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 20, padding: 28, display: "flex", flexDirection: "column", position: "relative", overflow: "hidden" }}>
+      <div style={{ position: "absolute", top: "-20%", right: "-10%", width: 300, height: 300, background: "radial-gradient(circle, rgba(235,136,0,0.08) 0%, transparent 65%)", pointerEvents: "none" }} />
+
+      {/* Estado */}
+      <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 22 }}>
+        <span style={{ width: 7, height: 7, borderRadius: "50%", background: theme.orange, display: "inline-block", flexShrink: 0 }} />
+        <span style={{ fontSize: "0.65rem", fontWeight: 700, letterSpacing: 3, color: theme.orange, textTransform: "uppercase" }}>Vehículo en uso</span>
+      </div>
+
+      {/* Marca + Modelo */}
+      <p style={{ fontSize: "0.68rem", fontWeight: 700, letterSpacing: 2.5, color: theme.gray400, textTransform: "uppercase", marginBottom: 4 }}>{marca}</p>
+      <h2 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "clamp(1.6rem, 3.5vw, 2.2rem)", letterSpacing: -0.5, color: theme.white, marginBottom: 6 }}>{modelo}</h2>
+      <p style={{ fontSize: "0.85rem", color: theme.gray400, marginBottom: 0 }}>
+        {[auto.variant, auto.year ? `Modelo ${auto.year}` : ""].filter(Boolean).join(" · ")}
+      </p>
+
+      <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "20px 0" }} />
+
+      {/* Patente */}
+      <p style={{ fontSize: "0.65rem", fontWeight: 700, letterSpacing: 2.5, color: theme.gray400, textTransform: "uppercase", marginBottom: 12 }}>Patente</p>
+      <PlateDisplay patente={auto.patente} />
+
+
+      <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "20px 0" }} />
+
+      {/* Stats */}
+      <div style={{ display: "grid", gridTemplateColumns: auto.transmission ? "1fr 1fr 1fr" : "1fr 1fr", gap: 20 }}>
+        {[
+          {
+            icon: <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
+            label: "En uso desde", value: auto.desde || "—",
+          },
+          {
+            icon: <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+            label: "Modelo", value: auto.year || "—",
+          },
+          ...(auto.transmission ? [{
+            icon: <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="5" cy="12" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="19" cy="19" r="2"/><line x1="5" y1="10" x2="5" y2="4"/><line x1="5" y1="20" x2="5" y2="14"/><line x1="7" y1="12" x2="17" y2="7"/><line x1="7" y1="12" x2="17" y2="17"/></svg>,
+            label: "Transmisión",
+            value: auto.transmission === "Manual" ? "Manual · 6 vel." : auto.transmission,
+          }] : []),
+        ].map((s, i) => (
+          <div key={i}>
+            <p style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: 2, color: theme.gray400, textTransform: "uppercase", marginBottom: 6, display: "flex", alignItems: "center", gap: 5 }}>
+              {s.icon}{s.label}
+            </p>
+            <p style={{ fontSize: "0.95rem", fontWeight: 700, color: theme.white }}>{s.value}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── Patente ── */
+function PlateDisplay({ patente }) {
+  if (!patente) return <span style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "2rem", color: theme.gray600 }}>—</span>;
+  const clean = patente.toUpperCase().replace(/[\s\-]/g, "");
+  let formatted = patente.toUpperCase();
+  if (clean.length === 7) formatted = `${clean.slice(0,2)} ${clean.slice(2,5)} ${clean.slice(5)}`;
+  else if (clean.length === 6) formatted = `${clean.slice(0,3)} ${clean.slice(3)}`;
+
+  return (
+    <span style={{
+      fontFamily: "'Archivo Black', sans-serif",
+      fontSize: "clamp(2rem, 4vw, 2.8rem)",
+      letterSpacing: 4,
+      color: theme.white,
+      display: "block",
+      lineHeight: 1,
+    }}>
+      {formatted}
+    </span>
   );
 }
 
@@ -1567,6 +1845,8 @@ function TurnosTab({ user, apiFetch, navigate }) {
   const [cancelError, setCancelError] = useState("");
   const [sortBy, setSortBy] = useState("turno"); // "turno" | "solicitud"
   const [order, setOrder] = useState("desc"); // "desc" | "asc"
+  const [sortOpen, setSortOpen] = useState(false);
+  const sortRef = useRef(null);
 
   const fetchTurnos = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -1606,6 +1886,12 @@ function TurnosTab({ user, apiFetch, navigate }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    const handleOutside = (e) => { if (sortRef.current && !sortRef.current.contains(e.target)) setSortOpen(false); };
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, []);
+
   const todayStr = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })();
   const tomorrowStr = (() => { const d = new Date(); d.setDate(d.getDate()+1); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })();
 
@@ -1640,7 +1926,7 @@ function TurnosTab({ user, apiFetch, navigate }) {
       );
       setCancelTarget(null);
     } catch (err) {
-      setCancelError(err.message || "No se pudo cancelar el turno. Intentá de nuevo.");
+      setCancelError(err.message || "No se pudo cancelar el turno. Intenta de nuevo.");
     } finally {
       setCancelling(false);
     }
@@ -1741,13 +2027,6 @@ function TurnosTab({ user, apiFetch, navigate }) {
     ? new Date(scheduledDay(cancelTarget) + "T12:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" })
     : "";
 
-  const sortBtnStyle = (active) => ({
-    padding: "7px 14px", borderRadius: 8, fontSize: "0.8rem", fontWeight: 600,
-    fontFamily: "'DM Sans', sans-serif", cursor: "pointer", border: "none",
-    background: active ? theme.orange : "rgba(255,255,255,0.06)",
-    color: active ? theme.black : theme.gray300,
-  });
-
   return (
     <div className="anim-in">
       {/* Modal confirmación cancelación */}
@@ -1762,7 +2041,7 @@ function TurnosTab({ user, apiFetch, navigate }) {
               Vas a cancelar el turno del <strong style={{ color: theme.white }}>{cancelDateLabel}</strong>.
             </p>
             <p style={{ fontSize: "0.82rem", color: "#ff8080", lineHeight: 1.5, marginBottom: 20 }}>
-              Recordá que 2 turnos perdidos o cancelados sin anticipación generan una penalidad económica.
+              Recuerda que 2 turnos perdidos o cancelados sin anticipación generan una penalidad económica.
             </p>
             {cancelError && <p style={{ fontSize: "0.82rem", color: "#ff4444", marginBottom: 12 }}>{cancelError}</p>}
             <div style={{ display: "flex", gap: 10 }}>
@@ -1779,32 +2058,101 @@ function TurnosTab({ user, apiFetch, navigate }) {
         </div>
       )}
 
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
-        <div>
-          <p style={{ fontSize: "0.78rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: theme.gray400 }}>Mis Turnos</p>
+      {/* Header + Sort dropdown */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
+
+        {/* Dropdown ordenar */}
+        <div style={{ position: "relative" }} ref={sortRef}>
+          <button
+            onClick={() => setSortOpen((v) => !v)}
+            style={{
+              display: "flex", flexDirection: "column", gap: 3, padding: "9px 14px",
+              background: sortOpen ? "rgba(235,136,0,0.06)" : "rgba(255,255,255,0.04)",
+              border: `1px solid ${sortOpen ? "rgba(235,136,0,0.3)" : "rgba(255,255,255,0.1)"}`,
+              borderRadius: 10, cursor: "pointer", textAlign: "left", fontFamily: "'DM Sans', sans-serif",
+            }}
+          >
+            <span style={{ fontSize: "0.6rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: 2.5, color: theme.orange }}>Ordenar</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+              <span style={{ fontSize: "0.85rem", fontWeight: 600, color: theme.white }}>
+                {sortBy === "turno" ? "Día de turno" : "Día de solicitud"}
+              </span>
+              <span style={{ color: theme.gray600, fontSize: "1rem", lineHeight: 1 }}>·</span>
+              <span style={{ fontSize: "0.85rem", color: theme.gray300 }}>
+                {order === "desc" ? "Más nuevo primero" : "Más viejo primero"}
+              </span>
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke={theme.gray400} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                {sortOpen ? <path d="M2 8L6 4L10 8" /> : <path d="M2 4L6 8L10 4" />}
+              </svg>
+            </div>
+          </button>
+
+          {/* Panel desplegable */}
+          {sortOpen && (
+            <div style={{ position: "absolute", top: "calc(100% + 8px)", left: 0, zIndex: 50, background: theme.gray800, border: "1px solid rgba(255,255,255,0.1)", borderRadius: 14, padding: "10px 0", minWidth: 248, boxShadow: "0 16px 48px rgba(0,0,0,0.65)" }}>
+
+              {/* Campo de fecha */}
+              <p style={{ fontSize: "0.6rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: 2.5, color: theme.gray400, padding: "4px 16px 8px" }}>Campo de fecha</p>
+              {[
+                {
+                  value: "turno", label: "Día de turno",
+                  icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
+                },
+                {
+                  value: "solicitud", label: "Día de solicitud",
+                  icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+                },
+              ].map((opt) => (
+                <button key={opt.value} onClick={() => setSortBy(opt.value)}
+                  style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 16px", background: sortBy === opt.value ? "rgba(235,136,0,0.1)" : "transparent", border: "none", color: sortBy === opt.value ? theme.white : theme.gray300, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: "0.88rem", fontWeight: sortBy === opt.value ? 600 : 400 }}>
+                  <span style={{ color: sortBy === opt.value ? theme.orange : theme.gray400 }}>{opt.icon}</span>
+                  <span style={{ flex: 1, textAlign: "left" }}>{opt.label}</span>
+                  {sortBy === opt.value && (
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={theme.orange} strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  )}
+                </button>
+              ))}
+
+              <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "8px 0" }} />
+
+              {/* Dirección */}
+              <p style={{ fontSize: "0.6rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: 2.5, color: theme.gray400, padding: "4px 16px 8px" }}>Dirección</p>
+              {[
+                {
+                  value: "desc", label: "Más nuevo primero",
+                  icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>,
+                },
+                {
+                  value: "asc", label: "Más viejo primero",
+                  icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>,
+                },
+              ].map((opt) => (
+                <button key={opt.value} onClick={() => setOrder(opt.value)}
+                  style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 16px", background: order === opt.value ? "rgba(235,136,0,0.1)" : "transparent", border: "none", color: order === opt.value ? theme.white : theme.gray300, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: "0.88rem", fontWeight: order === opt.value ? 600 : 400 }}>
+                  <span style={{ color: order === opt.value ? theme.orange : theme.gray400 }}>{opt.icon}</span>
+                  <span style={{ flex: 1, textAlign: "left" }}>{opt.label}</span>
+                  {order === opt.value && (
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={theme.orange} strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Derecha: actualizado + botón actualizar */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           {lastUpdated && (
-            <p style={{ fontSize: "0.72rem", color: theme.gray400, marginTop: 2 }}>
+            <p style={{ fontSize: "0.72rem", color: theme.gray400, display: "flex", alignItems: "center", gap: 5, margin: 0 }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#4caf50", display: "inline-block", flexShrink: 0 }} />
               Actualizado {lastUpdated.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
             </p>
           )}
-        </div>
-        <button onClick={() => fetchTurnos(true)} disabled={refreshing} title="Actualizar turnos"
-          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, color: theme.gray300, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: "0.8rem", cursor: refreshing ? "not-allowed" : "pointer", opacity: refreshing ? 0.6 : 1 }}>
-          <RefreshIcon size={14} spinning={refreshing} />
-          {refreshing ? "Actualizando…" : "Actualizar"}
-        </button>
-      </div>
-
-      {/* Filtros */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
-        <div style={{ display: "flex", gap: 6, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, padding: 4 }}>
-          <button style={sortBtnStyle(sortBy === "turno")} onClick={() => setSortBy("turno")}>Por día de turno</button>
-          <button style={sortBtnStyle(sortBy === "solicitud")} onClick={() => setSortBy("solicitud")}>Por día de solicitud</button>
-        </div>
-        <div style={{ display: "flex", gap: 6, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, padding: 4 }}>
-          <button style={sortBtnStyle(order === "desc")} onClick={() => setOrder("desc")}>Más nuevo primero</button>
-          <button style={sortBtnStyle(order === "asc")} onClick={() => setOrder("asc")}>Más viejo primero</button>
+          <button onClick={() => fetchTurnos(true)} disabled={refreshing} title="Actualizar turnos"
+            style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, color: theme.gray300, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: "0.8rem", cursor: refreshing ? "not-allowed" : "pointer", opacity: refreshing ? 0.6 : 1 }}>
+            <RefreshIcon size={14} spinning={refreshing} />
+            {refreshing ? "Actualizando…" : "Actualizar"}
+          </button>
         </div>
       </div>
 
@@ -1816,7 +2164,7 @@ function TurnosTab({ user, apiFetch, navigate }) {
             <p style={{ fontSize: "0.78rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: theme.orange, marginBottom: 16 }}>Próximos</p>
             {upcomingDays.length === 0 ? (
               <div style={{ background: theme.gray900, border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: 24, textAlign: "center" }}>
-                <p style={{ color: theme.gray400, fontSize: "0.9rem", marginBottom: 14 }}>No tenés turnos agendados.</p>
+                <p style={{ color: theme.gray400, fontSize: "0.9rem", marginBottom: 14 }}>No tienes turnos agendados.</p>
                 <button onClick={() => navigate("turnos")}
                   style={{ padding: "10px 20px", background: theme.orange, border: "none", borderRadius: 8, color: theme.black, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer" }}>
                   Solicitar turno →
@@ -1853,8 +2201,10 @@ function TurnosTab({ user, apiFetch, navigate }) {
    CHANGE PASSWORD PAGE (primer login)
    ───────────────────────────────────────────── */
 function ChangePasswordPage({ user, token, onComplete }) {
+  const [currentPass, setCurrentPass] = useState("");
   const [newPass, setNewPass] = useState("");
   const [confirmPass, setConfirmPass] = useState("");
+  const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState("");
@@ -1863,8 +2213,8 @@ function ChangePasswordPage({ user, token, onComplete }) {
   const inputStyle = { width: "100%", padding: "14px 16px", background: theme.gray800, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, color: theme.white, fontFamily: "'DM Sans', sans-serif", fontSize: "0.95rem" };
 
   const handleChange = async () => {
-    if (!newPass || !confirmPass) {
-      setError("Completá ambos campos.");
+    if (!currentPass || !newPass || !confirmPass) {
+      setError("Completa todos los campos.");
       return;
     }
     if (newPass.length < 8) {
@@ -1887,6 +2237,7 @@ function ChangePasswordPage({ user, token, onComplete }) {
           "Authorization": `Bearer ${token}`,
         },
         body: JSON.stringify({
+          current_password: currentPass,
           password: newPass,
           password_confirmation: confirmPass,
         }),
@@ -1909,7 +2260,7 @@ function ChangePasswordPage({ user, token, onComplete }) {
       onComplete(data.token || null);
 
     } catch (err) {
-      setError("Error de conexión. Intentá de nuevo.");
+      setError("Error de conexión. Intenta de nuevo.");
       setLoading(false);
     }
   };
@@ -1926,11 +2277,30 @@ function ChangePasswordPage({ user, token, onComplete }) {
           </div>
           <h2 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.5rem", letterSpacing: -0.5, marginBottom: 6 }}>Cambiá tu contraseña</h2>
           <p style={{ color: theme.gray400, fontSize: "0.9rem", lineHeight: 1.5 }}>
-            Es tu primer inicio de sesión. Por seguridad,<br />elegí una contraseña nueva.
+            Es tu primer inicio de sesión. Por seguridad,<br />elige una contraseña nueva.
           </p>
         </div>
 
         <div style={{ background: theme.gray900, border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: "clamp(24px, 5vw, 36px)" }}>
+
+          <div style={{ marginBottom: 18 }}>
+            <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, marginBottom: 7, color: theme.gray200 }}>
+              Contraseña actual <span style={{ color: theme.orange }}>*</span>
+            </label>
+            <div style={{ position: "relative" }}>
+              <input
+                type={showCurrent ? "text" : "password"}
+                value={currentPass}
+                onChange={(e) => setCurrentPass(e.target.value)}
+                style={{ ...inputStyle, paddingRight: 48 }}
+                placeholder="Tu contraseña actual"
+                onKeyDown={(e) => e.key === "Enter" && handleChange()}
+              />
+              <button onClick={() => setShowCurrent(!showCurrent)} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: theme.gray400, cursor: "pointer", fontSize: "0.8rem", fontFamily: "'DM Sans', sans-serif" }}>
+                {showCurrent ? "Ocultar" : "Ver"}
+              </button>
+            </div>
+          </div>
 
           <div style={{ marginBottom: 18 }}>
             <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, marginBottom: 7, color: theme.gray200 }}>
@@ -2041,7 +2411,7 @@ function TurnosPage({ user, apiFetch, navigate }) {
       const date = new Date(y, m, d);
       if (date.getMonth() !== m) break;
       const dateStr = `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-      if (date >= today && date.getDay() !== 0 && date.getDay() !== 6 && !fullDates.includes(dateStr)) {
+      if (date >= today && date.getDay() !== 0 && date.getDay() !== 3 && date.getDay() !== 6 && !fullDates.includes(dateStr)) {
         available.push(dateStr);
       }
     }
@@ -2062,7 +2432,7 @@ function TurnosPage({ user, apiFetch, navigate }) {
 
   const handleSubmit = async () => {
     if (!descripcion.trim()) {
-      setError("Describí el problema o motivo de la revisión.");
+      setError("Describe el problema o motivo de la revisión.");
       return;
     }
     if (!urgencia) {
@@ -2098,7 +2468,7 @@ function TurnosPage({ user, apiFetch, navigate }) {
       setLoading(false);
       setConfirmed(true);
     } catch (err) {
-      setError(err.message || "Error de conexión. Intentá de nuevo.");
+      setError(err.message || "Error de conexión. Intenta de nuevo.");
       setLoading(false);
     }
   };
@@ -2120,7 +2490,7 @@ function TurnosPage({ user, apiFetch, navigate }) {
                 a la brevedad posible.
               </p>
               <p style={{ color: theme.gray400, fontSize: "0.84rem", marginTop: 16, lineHeight: 1.5 }}>
-                Presentate en el taller con el vehículo. Si no podés asistir, cancelá con anticipación para evitar penalidades.
+                Preséntate en el taller con el vehículo. Si no puedes asistir, cancela con anticipación para evitar penalidades.
               </p>
             </>
           ) : (
@@ -2132,7 +2502,7 @@ function TurnosPage({ user, apiFetch, navigate }) {
                 {new Date(selectedDate + "T12:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
               </p>
               <p style={{ color: theme.gray400, fontSize: "0.84rem", marginTop: 16, lineHeight: 1.5 }}>
-                Presentate puntual. Si no podés asistir, cancelá con al menos <strong style={{ color: theme.white }}>24 hs de anticipación</strong> para evitar que cuente como turno perdido.
+                Preséntate puntual. Si no puedes asistir, cancela con al menos <strong style={{ color: theme.white }}>24 hs de anticipación</strong> para evitar que cuente como turno perdido.
               </p>
               <button
                 onClick={() => navigate("dashboard")}
@@ -2153,7 +2523,7 @@ function TurnosPage({ user, apiFetch, navigate }) {
         <SectionLabel>Revisión mecánica</SectionLabel>
         <SectionTitle>Solicitar turno</SectionTitle>
         <p style={{ fontSize: "0.95rem", color: theme.gray400, lineHeight: 1.6 }}>
-          Completá el formulario para pedir un turno de revisión para tu vehículo.
+          Completa el formulario para pedir un turno de revisión para tu vehículo.
         </p>
       </div>
 
@@ -2172,7 +2542,7 @@ function TurnosPage({ user, apiFetch, navigate }) {
         <div className="anim-in d1" style={{ background: "rgba(235,136,0,0.06)", border: "1px solid rgba(235,136,0,0.2)", borderRadius: 14, padding: 18, marginBottom: 24, display: "flex", alignItems: "center", gap: 12 }}>
           <AlertIcon size={18} />
           <p style={{ fontSize: "0.88rem", color: theme.gray300, lineHeight: 1.5 }}>
-            Todavía no tenés un vehículo asignado. Podés igualmente solicitar un turno y el sistema lo vinculará una vez que se te asigne uno.
+            Todavía no tienes un vehículo asignado. Puedes igualmente solicitar un turno y el sistema lo vinculará una vez que se te asigne uno.
           </p>
         </div>
       )}
@@ -2199,8 +2569,8 @@ function TurnosPage({ user, apiFetch, navigate }) {
           </label>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {[
-              { value: "normal", label: "Normal", desc: "Revisión de rutina, service o problema menor. Elegís el día en el calendario.", color: theme.orange, bgColor: "rgba(235,136,0,0.08)", borderColor: "rgba(235,136,0,0.2)" },
-              { value: "urgente", label: "Urgente", desc: "El vehículo tiene una falla grave que te impide trabajar hoy. Solo usá esta opción si realmente no podés circular.", color: "#ff4444", bgColor: "rgba(255,68,68,0.08)", borderColor: "rgba(255,68,68,0.3)" },
+              { value: "normal", label: "Normal", desc: "Revisión de rutina, service o problema menor. Eliges el día en el calendario.", color: theme.orange, bgColor: "rgba(235,136,0,0.08)", borderColor: "rgba(235,136,0,0.2)" },
+              { value: "urgente", label: "Urgente", desc: "El vehículo tiene una falla grave que te impide trabajar hoy. Solo usa esta opción si realmente no puedes circular.", color: "#ff4444", bgColor: "rgba(255,68,68,0.08)", borderColor: "rgba(255,68,68,0.3)" },
             ].map((opt) => (
               <button
                 key={opt.value}
@@ -2269,23 +2639,41 @@ function TurnosPage({ user, apiFetch, navigate }) {
               {Array.from({ length: daysInMonth }, (_, i) => {
                 const day = i + 1;
                 const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+                const dateObj = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+                const todayObj = new Date(); todayObj.setHours(0, 0, 0, 0);
+                const dow = dateObj.getDay();
+                const isPast = dateObj < todayObj;
+                const isToday = dateObj.getTime() === todayObj.getTime();
+                const isNonWorking = dow === 0 || dow === 3 || dow === 6;
                 const isAvailable = availableDates.includes(dateStr);
-                const isFull = fullDates.includes(dateStr);
+                const isFull = !isNonWorking && !isPast && fullDates.includes(dateStr);
                 const isSelected = selectedDate === dateStr;
+
+                let bg, color, border, cursor, textDecoration;
+                if (isSelected) {
+                  bg = "rgba(235,136,0,0.15)"; color = theme.orange; border = `2px solid ${theme.orange}`; cursor = "pointer";
+                } else if (isAvailable) {
+                  bg = "rgba(255,255,255,0.04)"; color = theme.white; border = "1px solid transparent"; cursor = "pointer";
+                } else if (isFull) {
+                  bg = "rgba(255,70,70,0.07)"; color = "rgba(255,120,120,0.55)"; border = "1px solid rgba(255,70,70,0.15)"; cursor = "default"; textDecoration = "line-through";
+                } else {
+                  bg = "transparent"; color = isPast ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.1)"; border = "1px solid transparent"; cursor = "default";
+                }
+
                 return (
                   <button
                     key={day}
                     onClick={() => isAvailable && setSelectedDate(dateStr)}
                     disabled={!isAvailable}
-                    title={isFull ? "Sin cupo" : undefined}
+                    title={isFull ? "Sin cupo" : isNonWorking ? "No laborable" : isPast ? "Fecha pasada" : undefined}
                     className="cal-day"
                     style={{
-                      aspectRatio: "1", border: isSelected ? `2px solid ${theme.orange}` : "1px solid transparent",
-                      borderRadius: 10,
-                      background: isSelected ? "rgba(235,136,0,0.15)" : isAvailable ? "rgba(255,255,255,0.04)" : "transparent",
-                      color: isSelected ? theme.orange : isAvailable ? theme.white : "rgba(255,255,255,0.15)",
-                      fontFamily: "'DM Sans', sans-serif", fontWeight: isSelected ? 700 : 500, fontSize: "0.88rem",
-                      cursor: isAvailable ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center",
+                      aspectRatio: "1", border, borderRadius: 10, background: bg, color,
+                      fontFamily: "'DM Sans', sans-serif", fontWeight: isSelected ? 700 : isToday ? 700 : 500, fontSize: "0.88rem",
+                      cursor, display: "flex", alignItems: "center", justifyContent: "center",
+                      textDecoration: textDecoration || "none",
+                      outline: isToday && !isSelected ? "2px solid rgba(255,255,255,0.35)" : "none",
+                      outlineOffset: "-2px",
                     }}
                   >{day}</button>
                 );
@@ -2301,7 +2689,12 @@ function TurnosPage({ user, apiFetch, navigate }) {
                 <div style={{ width: 12, height: 12, borderRadius: 3, background: "rgba(235,136,0,0.15)", border: "2px solid rgba(235,136,0,0.6)" }} /> Seleccionado
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.78rem", color: theme.gray400 }}>
-                <div style={{ width: 12, height: 12, borderRadius: 3, background: "transparent", border: "1px solid rgba(255,255,255,0.06)" }} /> Sin cupo / no disponible
+                <div style={{ width: 12, height: 12, borderRadius: 3, background: "rgba(255,70,70,0.07)", border: "1px solid rgba(255,70,70,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <div style={{ width: 8, height: 1, background: "rgba(255,120,120,0.55)" }} />
+                </div> Sin cupo
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.78rem", color: theme.gray400 }}>
+                <div style={{ width: 12, height: 12, borderRadius: 3, background: "transparent", border: "1px solid transparent" }} /> No laborable
               </div>
             </div>
 
