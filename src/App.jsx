@@ -654,9 +654,9 @@ function HomePage({ navigate, user }) {
 
           {/* Titular */}
           <h1 className="anim-in d1" style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "clamp(2.6rem, 8vw, 5rem)", lineHeight: 1.0, letterSpacing: -2, marginBottom: 22, maxWidth: 720 }}>
-            Alquila un auto.<br />
-            <span style={{ color: theme.orange }}>Genera ingresos</span><br />
-            desde el día uno.
+            Alquila.<br />
+            Maneja.<br />
+            <span style={{ color: theme.orange }}>Genera.</span>
           </h1>
 
           <p className="anim-in d2" style={{ fontSize: "1.05rem", color: theme.gray300, lineHeight: 1.65, marginBottom: 36, maxWidth: 480 }}>
