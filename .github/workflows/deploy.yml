@@ -5,6 +5,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -27,14 +30,12 @@ jobs:
       - name: Verify dist exists
         run: ls -la dist
 
-      - name: Deploy dist only
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      # Guarda solo la página armada en la rama "deploy".
+      # Hostinger (Git) copia esa rama a public_html.
+      - name: Publish dist to deploy branch
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          protocol: ftp
-          port: 21
-          local-dir: dist/
-          server-dir: public_html/
-          dangerous-clean-slate: true
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          publish_branch: deploy
+          force_orphan: true
