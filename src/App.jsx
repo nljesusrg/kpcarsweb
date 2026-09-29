@@ -604,8 +604,6 @@ function Nav({ page, navigate, menuOpen, setMenuOpen, user, onLogout }) {
    ───────────────────────────────────────────── */
 function HomePage({ navigate, user }) {
   const stats = [
-    { number: "80+", label: "Choferes activos" },
-    { number: "100+", label: "Vehículos en flota" },
     { number: "100%", label: "Flota Toyota" },
     { number: "BA", label: "Buenos Aires" },
   ];
