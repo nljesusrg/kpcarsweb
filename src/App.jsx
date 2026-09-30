@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router";
 
 /* ─── LOGOS ─── */
 import kpLogo from "./assets/kpcars-logo-blanco.png";
@@ -230,29 +231,52 @@ const AlertIcon = ({ size = 24 }) => (
 /* ─────────────────────────────────────────────
    MAIN APP
    ───────────────────────────────────────────── */
+/* Dirección (URL) de cada sección */
+const pagePaths = {
+  home: "/",
+  catalog: "/flota",
+  apply: "/quiero-manejar",
+  login: "/conductores",
+  "change-password": "/cambiar-contrasena",
+  dashboard: "/panel",
+  turnos: "/turnos",
+};
+const pathPages = Object.fromEntries(Object.entries(pagePaths).map(([p, path]) => [path, p]));
+
+const pageTitles = {
+  home: "KPCars — Alquiler de autos para conductores en Buenos Aires",
+  catalog: "Flota — KPCars",
+  apply: "Quiero manejar — KPCars",
+  login: "Zona Conductores — KPCars",
+  "change-password": "Cambiar contraseña — KPCars",
+  dashboard: "Mi Panel — KPCars",
+  turnos: "Solicitar turno — KPCars",
+};
+
 export default function KPCarsApp() {
-  const [page, setPage] = useState("home");
+  const location = useLocation();
+  const routerNavigate = useNavigate();
+  // "/flota/" y "/flota" son la misma sección
+  const currentPath = location.pathname.replace(/\/+$/, "") || "/";
+  const page = pathPages[currentPath] || "home";
+
   const [menuOpen, setMenuOpen] = useState(false);
   const [user, setUser] = useState(() => {
     try { const s = localStorage.getItem("kpcars_user"); return s ? JSON.parse(s) : null; } catch { return null; }
   });
   const [token, setToken] = useState(() => localStorage.getItem("kpcars_token") || null);
 
-  const pageTitles = {
-    home: "KPCars — Alquiler de autos para conductores en Buenos Aires",
-    catalog: "Flota — KPCars",
-    apply: "Quiero manejar — KPCars",
-    login: "Zona Conductores — KPCars",
-    "change-password": "Cambiar contraseña — KPCars",
-    dashboard: "Mi Panel — KPCars",
-    turnos: "Solicitar turno — KPCars",
-  };
+  // Cada vez que cambia la dirección (también con el botón "Atrás"): título y scroll arriba
+  useEffect(() => {
+    document.title = pageTitles[pathPages[currentPath]] || "KPCars";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [currentPath]);
 
   const navigate = (p) => {
-    setPage(p);
+    const path = pagePaths[p] || "/";
     setMenuOpen(false);
-    document.title = pageTitles[p] || "KPCars";
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (path === currentPath) window.scrollTo({ top: 0, behavior: "smooth" });
+    else routerNavigate(path);
   };
 
   // Función auxiliar para hacer requests autenticados a la API
@@ -502,13 +526,18 @@ export default function KPCarsApp() {
 
       <Nav page={page} navigate={navigate} menuOpen={menuOpen} setMenuOpen={setMenuOpen} user={user} onLogout={handleLogout} />
 
-      {page === "home" && <HomePage navigate={navigate} user={user} />}
-      {page === "catalog" && <CatalogPage navigate={navigate} user={user} />}
-      {page === "apply" && <ApplyPage />}
-      {page === "login" && (user ? navigate("dashboard") || null : <LoginPage onLogin={handleLogin} />)}
-      {page === "change-password" && user && <ChangePasswordPage user={user} token={token} onComplete={handlePasswordChanged} />}
-      {page === "dashboard" && user && <DashboardPage user={user} navigate={navigate} apiFetch={apiFetch} onUserUpdate={(updated) => { setUser(updated); localStorage.setItem("kpcars_user", JSON.stringify(updated)); }} />}
-      {page === "turnos" && user && <TurnosPage user={user} apiFetch={apiFetch} navigate={navigate} />}
+      <Routes>
+        <Route path="/" element={<HomePage navigate={navigate} user={user} />} />
+        <Route path="/flota" element={<CatalogPage navigate={navigate} user={user} />} />
+        <Route path="/quiero-manejar" element={<ApplyPage />} />
+        <Route path="/conductores" element={user ? <Navigate to="/panel" replace /> : <LoginPage onLogin={handleLogin} />} />
+        {/* Páginas privadas: sin sesión, van a Zona Conductores */}
+        <Route path="/cambiar-contrasena" element={user ? <ChangePasswordPage user={user} token={token} onComplete={handlePasswordChanged} /> : <Navigate to="/conductores" replace />} />
+        <Route path="/panel" element={user ? <DashboardPage user={user} navigate={navigate} apiFetch={apiFetch} onUserUpdate={(updated) => { setUser(updated); localStorage.setItem("kpcars_user", JSON.stringify(updated)); }} /> : <Navigate to="/conductores" replace />} />
+        <Route path="/turnos" element={user ? <TurnosPage user={user} apiFetch={apiFetch} navigate={navigate} /> : <Navigate to="/conductores" replace />} />
+        {/* Dirección desconocida: al inicio (la página 404 llega en la Etapa 3) */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
 
       {!["dashboard", "turnos", "change-password"].includes(page) && <Footer navigate={navigate} user={user} />}
 
