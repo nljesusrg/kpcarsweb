@@ -128,6 +128,14 @@ const CloseIcon = ({ size = 24 }) => (
   </svg>
 );
 
+const LogoutIcon = ({ size = 18 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+    <polyline points="16 17 21 12 16 7" />
+    <line x1="21" y1="12" x2="9" y2="12" />
+  </svg>
+);
+
 const UserIcon = ({ size = 18 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -557,6 +565,7 @@ function Nav({ page, navigate, menuOpen, setMenuOpen, user, onLogout }) {
     link: (active) => ({ color: active ? theme.white : theme.gray300, textDecoration: "none", fontSize: "0.88rem", fontWeight: 500, padding: "8px 14px", borderRadius: 8, background: active ? "rgba(255,255,255,0.06)" : "transparent", cursor: "pointer", display: "block" }),
     cta: { background: theme.orange, color: theme.black, fontWeight: 700, padding: "8px 16px", borderRadius: 8, fontSize: "0.88rem", cursor: "pointer", textDecoration: "none", display: "block", textAlign: "center" },
     loginBtn: { background: "none", border: "1px solid rgba(255,255,255,0.15)", color: theme.gray300, fontWeight: 500, padding: "8px 14px", borderRadius: 8, fontSize: "0.88rem", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "'DM Sans', sans-serif" },
+    mobileBtn: { display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 6, padding: "12px 16px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 10, color: theme.white, fontSize: "0.9rem", fontWeight: 600, cursor: "pointer" },
     hamburger: { background: "none", border: "none", cursor: "pointer", padding: 4, display: "none" },
     mobileLinks: { position: "absolute", top: 64, left: 0, right: 0, background: "rgba(10,10,10,0.98)", backdropFilter: "blur(20px)", padding: "12px 20px 16px", display: "flex", flexDirection: "column", gap: 4, borderBottom: "1px solid rgba(255,255,255,0.06)" },
   };
@@ -574,14 +583,14 @@ function Nav({ page, navigate, menuOpen, setMenuOpen, user, onLogout }) {
           {user ? (
             <>
               <a style={s.link(page === "dashboard")} onClick={() => navigate("dashboard")}>Mi Panel</a>
-              <a style={s.link(page === "turnos")} onClick={() => navigate("turnos")}>Turnos</a>
+              <a style={s.link(page === "turnos")} onClick={() => navigate("turnos")}>Solicitar turno</a>
               <button style={s.loginBtn} onClick={onLogout}>
-                <UserIcon size={15} /> Salir
+                <LogoutIcon size={15} /> Cerrar sesión
               </button>
             </>
           ) : (
             <button style={s.loginBtn} onClick={() => navigate("login")}>
-              <UserIcon size={15} /> Conductores
+              <UserIcon size={15} /> Zona Conductores
             </button>
           )}
         </div>
@@ -602,16 +611,15 @@ function Nav({ page, navigate, menuOpen, setMenuOpen, user, onLogout }) {
             {user ? (
               <>
                 <a style={s.link(page === "dashboard")} onClick={() => navigate("dashboard")}>Mi Panel</a>
-                <a style={s.link(page === "turnos")} onClick={() => navigate("turnos")}>Turnos</a>
-                <a style={{ ...s.link(false), marginTop: 2 }} onClick={onLogout}>Cerrar sesión</a>
+                <a style={s.link(page === "turnos")} onClick={() => navigate("turnos")}>Solicitar turno</a>
+                <a onClick={onLogout} style={s.mobileBtn}>
+                  <LogoutIcon size={16} /> Cerrar sesión
+                </a>
               </>
             ) : (
               <>
                 <a style={{ ...s.cta, textAlign: "center", padding: "12px 16px" }} onClick={() => navigate("apply")}>Quiero manejar</a>
-                <a
-                  onClick={() => navigate("login")}
-                  style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 6, padding: "12px 16px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 10, color: theme.white, fontSize: "0.9rem", fontWeight: 600, cursor: "pointer" }}
-                >
+                <a onClick={() => navigate("login")} style={s.mobileBtn}>
                   <UserIcon size={16} /> Zona Conductores
                 </a>
               </>
@@ -2843,6 +2851,9 @@ function Footer({ navigate, user }) {
           <FooterLink onClick={() => navigate("home")}>Inicio</FooterLink>
           <FooterLink onClick={() => navigate("catalog")}>Flota</FooterLink>
           {!user && <FooterLink onClick={() => navigate("apply")}>Quiero manejar</FooterLink>}
+          {user
+            ? <FooterLink onClick={() => navigate("dashboard")}>Mi Panel</FooterLink>
+            : <FooterLink onClick={() => navigate("login")}>Zona Conductores</FooterLink>}
         </FooterCol>
         <FooterCol title="Contacto">
           <FooterLink href="tel:+541123850982">+54 11 2385-0982</FooterLink>
