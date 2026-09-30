@@ -658,7 +658,7 @@ function HomePage({ navigate, user }) {
           </h1>
 
           <p className="anim-in d2" style={{ fontSize: "1.05rem", color: theme.gray300, lineHeight: 1.65, marginBottom: 36, maxWidth: 480 }}>
-            Alquila uno de nuestros vehículos y trabaja en Uber, Didi, Cabify o donde quieras. Tú pones las ganas, nosotros ponemos el auto.
+            Alquilá uno de nuestros vehículos y trabajá en Uber, Didi, Cabify o donde quieras. Vos ponés las ganas, nosotros ponemos el auto.
           </p>
 
           <div className="anim-in d3" style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 72 }}>
