@@ -19,6 +19,10 @@ const GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycby9oZ4hlk8mqZF
 
 /* ─── API CONFIG ─── */
 const API_BASE = "https://kpcars.online/api";
+
+// WhatsApp en formato internacional, sin espacios ni símbolos (lo usa wa.me)
+const WHATSAPP_PUBLIC = "5491164423273";  // +54 9 11 6442-3273: consultas de quienes no son conductores
+const WHATSAPP_DRIVERS = "541123850982";  // +54 11 2385-0982: central para conductores
 const MEDIA_BASE = "https://kpcars.online";
 const toAbsoluteUrl = (url) => {
   if (!url) return null;
@@ -316,6 +320,24 @@ export default function KPCarsApp() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [currentPath]);
 
+  // Las secciones con clase "reveal" aparecen suavemente al llegar a ellas.
+  // Solo se ocultan las que están debajo de la pantalla; si algo falla, quedan visibles.
+  useEffect(() => {
+    if (!("IntersectionObserver" in window) || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const els = [...document.querySelectorAll(".reveal")].filter((el) => el.getBoundingClientRect().top > window.innerHeight * 0.9);
+    els.forEach((el) => el.classList.add("reveal-wait"));
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (!e.isIntersecting) return;
+        e.target.classList.remove("reveal-wait");
+        e.target.classList.add("reveal-in");
+        io.unobserve(e.target);
+      });
+    }, { rootMargin: "0px 0px -60px 0px" });
+    els.forEach((el) => io.observe(el));
+    return () => { io.disconnect(); els.forEach((el) => el.classList.remove("reveal-wait")); };
+  }, [currentPath]);
+
   const navigate = (p) => {
     const path = pagePaths[p] || "/";
     setMenuOpen(false);
@@ -555,6 +577,12 @@ export default function KPCarsApp() {
         #root { min-height: 100vh; }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
         .anim-in { animation: fadeUp 0.65s ease-out forwards; }
+        .reveal-wait { opacity: 0; transform: translateY(26px); }
+        .reveal-in { animation: fadeUp 0.6s ease-out both; }
+        .kp-btn { transition: transform 0.15s, filter 0.15s; }
+        .kp-btn:hover { transform: translateY(-1px); filter: brightness(1.1); }
+        .kp-btn:active { transform: translateY(0); }
+        @media (prefers-reduced-motion: reduce) { .anim-in, .reveal-in { animation: none !important; opacity: 1 !important; } }
         .d1 { animation-delay: 0.08s; opacity: 0; }
         .d2 { animation-delay: 0.16s; opacity: 0; }
         .d3 { animation-delay: 0.24s; opacity: 0; }
@@ -598,7 +626,7 @@ export default function KPCarsApp() {
 
       {!["dashboard", "turnos", "change-password"].includes(page) && <Footer navigate={navigate} user={user} />}
 
-      <WhatsAppButton />
+      <WhatsAppButton user={user} />
     </div>
   );
 }
@@ -613,22 +641,31 @@ function Private({ user, children }) {
    NAV
    ───────────────────────────────────────────── */
 function Nav({ page, navigate, menuOpen, setMenuOpen, user, onLogout }) {
+  // Al bajar, el menú se achica un poco para dejar más lugar al contenido
+  const [scrolled, setScrolled] = useState(() => window.scrollY > 24);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 24);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+  const navH = scrolled ? 54 : 64;
+
   const s = {
     nav: { position: "fixed", top: 0, left: 0, right: 0, zIndex: 100, background: "rgba(10,10,10,0.88)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(255,255,255,0.06)" },
-    inner: { maxWidth: 1200, margin: "0 auto", padding: "0 20px", height: 64, display: "flex", alignItems: "center", justifyContent: "space-between" },
+    inner: { maxWidth: 1200, margin: "0 auto", padding: "0 20px", height: navH, transition: "height 0.2s ease", display: "flex", alignItems: "center", justifyContent: "space-between" },
     logo: { fontFamily: "'Archivo Black', sans-serif", fontSize: "1.5rem", letterSpacing: -0.5, cursor: "pointer", display: "flex", gap: 2, textDecoration: "none", color: theme.white },
     link: (active) => ({ color: active ? theme.white : theme.gray300, textDecoration: "none", fontSize: "0.88rem", fontWeight: 500, padding: "8px 14px", borderRadius: 8, background: active ? "rgba(255,255,255,0.06)" : "transparent", cursor: "pointer", display: "block" }),
     cta: { background: theme.orange, color: theme.black, fontWeight: 700, padding: "8px 16px", borderRadius: 8, fontSize: "0.88rem", cursor: "pointer", textDecoration: "none", display: "block", textAlign: "center" },
     loginBtn: { background: "none", border: "1px solid rgba(255,255,255,0.15)", color: theme.gray300, fontWeight: 500, padding: "8px 14px", borderRadius: 8, fontSize: "0.88rem", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "'DM Sans', sans-serif" },
     mobileBtn: { display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 6, padding: "12px 16px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 10, color: theme.white, fontSize: "0.9rem", fontWeight: 600, cursor: "pointer" },
     hamburger: { background: "none", border: "none", cursor: "pointer", padding: 4, display: "none" },
-    mobileLinks: { position: "absolute", top: 64, left: 0, right: 0, background: "rgba(10,10,10,0.98)", backdropFilter: "blur(20px)", padding: "12px 20px 16px", display: "flex", flexDirection: "column", gap: 4, borderBottom: "1px solid rgba(255,255,255,0.06)" },
+    mobileLinks: { position: "absolute", top: navH, left: 0, right: 0, background: "rgba(10,10,10,0.98)", backdropFilter: "blur(20px)", padding: "12px 20px 16px", display: "flex", flexDirection: "column", gap: 4, borderBottom: "1px solid rgba(255,255,255,0.06)" },
   };
 
   return (
     <nav style={s.nav}>
       <div style={s.inner}>
-        <img src={kpLogo} alt="KPCars" onClick={() => navigate("home")} style={{ height: 52, cursor: "pointer" }} />
+        <img src={kpLogo} alt="KPCars" onClick={() => navigate("home")} style={{ height: scrolled ? 44 : 52, transition: "height 0.2s ease", cursor: "pointer" }} />
 
         {/* Desktop links */}
         <div style={{ display: "flex", gap: 6, alignItems: "center" }} className="desktop-nav">
@@ -660,7 +697,7 @@ function Nav({ page, navigate, menuOpen, setMenuOpen, user, onLogout }) {
 
       {menuOpen && (
         <>
-          <div onClick={() => setMenuOpen(false)} style={{ position: "fixed", inset: 0, top: 64, zIndex: 98 }} />
+          <div onClick={() => setMenuOpen(false)} style={{ position: "fixed", inset: 0, top: navH, zIndex: 98 }} />
           <div style={{ ...s.mobileLinks, zIndex: 99, position: "absolute" }}>
             <a style={s.link(page === "home")} onClick={() => navigate("home")}>Inicio</a>
             {areas.map((a) => (
@@ -721,12 +758,14 @@ function HomePage({ navigate, user }) {
   ];
 
   return (
-    <div>
+    <div style={{ overflowX: "clip" }}>
       <style>{`
-        .home-card { background: ${theme.gray900}; border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; padding: 28px; }
+        .home-card { background: ${theme.gray900}; border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; padding: 28px; transition: border-color 0.18s, transform 0.18s; }
+        .home-card:hover { border-color: rgba(235,136,0,0.35); transform: translateY(-3px); }
+        /* Fondo alternado: una franja de lado a lado detrás de la sección */
+        .home-section.alt { position: relative; isolation: isolate; }
+        .home-section.alt::before { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 100vw; transform: translateX(-50%); background: #0f0f0f; border-top: 1px solid rgba(255,255,255,0.04); border-bottom: 1px solid rgba(255,255,255,0.04); z-index: -1; }
         .home-section { max-width: 1200px; margin: 0 auto; padding: 56px 20px; }
-        .area-card { transition: border-color 0.15s, transform 0.15s; }
-        .area-card:hover { border-color: rgba(235,136,0,0.35); transform: translateY(-2px); }
         @media (max-width: 900px) {
           .features-grid { grid-template-columns: repeat(2, 1fr) !important; }
           .steps-grid { grid-template-columns: 1fr !important; }
@@ -786,8 +825,8 @@ function HomePage({ navigate, user }) {
       <FleetCarousel navigate={navigate} />
 
       {/* ── Cómo funciona ── */}
-      <div className="home-section">
-        <SectionHeader label="El proceso" title={<>Tres pasos para<br />estar en la calle</>}>
+      <div className="home-section reveal">
+        <SectionHeader label="El proceso" title={<>Tres pasos para<br /><Accent>estar en la calle</Accent></>}>
           Del formulario a la entrega del auto, te acompañamos en cada paso.
         </SectionHeader>
         <div className="steps-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
@@ -802,8 +841,8 @@ function HomePage({ navigate, user }) {
       </div>
 
       {/* ── Por qué KPCars ── */}
-      <div className="home-section">
-        <SectionHeader label="Por qué KPCars" title={<>Todo lo que necesitas<br />para empezar</>}>
+      <div className="home-section alt reveal">
+        <SectionHeader label="Por qué KPCars" title={<>Todo lo que necesitas<br /><Accent>para empezar</Accent></>}>
           Nos encargamos de que tengas un auto en condiciones, con papeles al día y listo para generar ingresos desde el día uno.
         </SectionHeader>
         <div className="features-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
@@ -818,8 +857,8 @@ function HomePage({ navigate, user }) {
       </div>
 
       {/* ── Plataformas ── */}
-      <div className="home-section">
-        <SectionHeader label="Plataformas compatibles" title="Trabaja donde quieras">
+      <div className="home-section reveal">
+        <SectionHeader label="Plataformas compatibles" title={<>Trabaja <Accent>donde quieras</Accent></>}>
           Nuestros autos están habilitados para todas las plataformas de transporte. Sin restricciones.
         </SectionHeader>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
@@ -838,8 +877,8 @@ function HomePage({ navigate, user }) {
       </div>
 
       {/* ── Áreas de KPCars ── */}
-      <div className="home-section">
-        <SectionHeader label="KPCars" title="Nuestros servicios">
+      <div className="home-section alt reveal">
+        <SectionHeader label="KPCars" title={<>Nuestros <Accent>servicios</Accent></>}>
           KPCars Rentals es nuestra área principal. Muy pronto sumamos fletes y auxilios.
         </SectionHeader>
         <div className="features-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
@@ -886,7 +925,7 @@ function FleetCarousel({ navigate }) {
   const arrow = (enabled) => ({ width: 42, height: 42, borderRadius: 12, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: theme.white, cursor: enabled ? "pointer" : "default", opacity: enabled ? 1 : 0.35, display: "flex", alignItems: "center", justifyContent: "center" });
 
   return (
-    <div className="home-section">
+    <div className="home-section alt reveal">
       <style>{`
         .fleet-track { display: flex; gap: 16px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
         .fleet-track::-webkit-scrollbar { display: none; }
@@ -901,7 +940,7 @@ function FleetCarousel({ navigate }) {
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: "12px 32px", marginBottom: 36 }}>
         <div>
           <SectionLabel>Nuestra flota</SectionLabel>
-          <h2 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "clamp(1.6rem, 5vw, 2.6rem)", letterSpacing: -1, lineHeight: 1.1 }}>Autos listos<br />para trabajar</h2>
+          <h2 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "clamp(1.6rem, 5vw, 2.6rem)", letterSpacing: -1, lineHeight: 1.1 }}>Autos listos<br /><Accent>para trabajar</Accent></h2>
         </div>
         <div className="fleet-arrows" style={{ display: "flex", gap: 8 }}>
           <button aria-label="Autos anteriores" disabled={!canPrev} onClick={() => move(-1)} style={arrow(canPrev)}>
@@ -961,7 +1000,7 @@ function ComingSoonPage({ area, navigate }) {
           Estamos preparando esta área. Mientras tanto, puedes consultarnos por WhatsApp.
         </p>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
-          <a href={`https://wa.me/541123850982?text=${waText}`} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "13px 24px", borderRadius: 12, fontSize: "0.92rem", fontWeight: 700, textDecoration: "none", background: theme.orange, color: theme.black }}>Consultar por WhatsApp</a>
+          <a className="kp-btn" href={`https://wa.me/${WHATSAPP_PUBLIC}?text=${waText}`} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "13px 24px", borderRadius: 12, fontSize: "0.92rem", fontWeight: 700, textDecoration: "none", background: theme.orange, color: theme.black }}>Consultar por WhatsApp</a>
           <Btn variant="secondary" onClick={() => navigate("home")}>Volver al inicio</Btn>
         </div>
       </div>
@@ -1553,7 +1592,7 @@ function LoginPage({ onLogin }) {
                 Para recuperar tu contraseña, comunícate con la central de KPCars:
               </p>
               <a
-                href="https://wa.me/541123850982?text=Hola%2C%20necesito%20recuperar%20mi%20contrase%C3%B1a"
+                href={`https://wa.me/${WHATSAPP_DRIVERS}?text=Hola%2C%20necesito%20recuperar%20mi%20contrase%C3%B1a`}
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "10px 16px", background: "#25D366", border: "none", borderRadius: 8, color: theme.white, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer", textDecoration: "none" }}
@@ -2969,7 +3008,12 @@ function Btn({ children, onClick, variant = "primary" }) {
   const styles = variant === "primary"
     ? { ...base, background: theme.orange, color: theme.black }
     : { ...base, background: "rgba(255,255,255,0.06)", color: theme.white, border: "1px solid rgba(255,255,255,0.1)" };
-  return <button style={styles} onClick={onClick}>{children}</button>;
+  return <button className="kp-btn" style={styles} onClick={onClick}>{children}</button>;
+}
+
+/* Parte del título resaltada en naranja */
+function Accent({ children }) {
+  return <span style={{ color: theme.orange }}>{children}</span>;
 }
 
 function SectionLabel({ children }) {
@@ -2995,12 +3039,12 @@ function SectionHeader({ label, title, children }) {
 
 function CTABanner({ navigate }) {
   return (
-    <div style={{ maxWidth: 1200, margin: "0 auto", padding: "56px 20px 80px" }}>
+    <div className="reveal" style={{ maxWidth: 1200, margin: "0 auto", padding: "56px 20px 80px" }}>
       <div style={{ background: `linear-gradient(135deg, ${theme.orange}, #d47a00)`, borderRadius: 20, padding: "clamp(32px, 6vw, 56px)", textAlign: "center", position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", top: "-50%", right: "-20%", width: 400, height: 400, background: "radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)", pointerEvents: "none" }} />
         <h2 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "clamp(1.4rem, 4vw, 2.2rem)", color: theme.black, marginBottom: 10, position: "relative" }}>¿Listo para empezar a generar?</h2>
         <p style={{ color: "rgba(0,0,0,0.7)", fontSize: "1rem", marginBottom: 24, position: "relative" }}>Completa el formulario y nos comunicamos contigo en menos de 24 horas.</p>
-        <button onClick={() => navigate("apply")} style={{ background: theme.black, color: theme.white, padding: "13px 24px", borderRadius: 12, fontSize: "0.92rem", fontWeight: 700, fontFamily: "'DM Sans', sans-serif", border: "none", cursor: "pointer", position: "relative" }}>Quiero ser conductor →</button>
+        <button className="kp-btn" onClick={() => navigate("apply")} style={{ background: theme.black, color: theme.white, padding: "13px 24px", borderRadius: 12, fontSize: "0.92rem", fontWeight: 700, fontFamily: "'DM Sans', sans-serif", border: "none", cursor: "pointer", position: "relative" }}>Quiero ser conductor →</button>
       </div>
     </div>
   );
@@ -3068,7 +3112,7 @@ function Footer({ navigate, user }) {
         <FooterCol title="Contacto">
           <FooterLink href="tel:+541123850982">+54 11 2385-0982</FooterLink>
           <FooterLink href="mailto:info@kpcars.com.ar">info@kpcars.com.ar</FooterLink>
-          <FooterLink href="https://wa.me/541123850982" external>WhatsApp</FooterLink>
+          <FooterLink href={`https://wa.me/${WHATSAPP_PUBLIC}`} external>WhatsApp</FooterLink>
         </FooterCol>
         <FooterCol title="Redes sociales">
           <FooterLink href="https://instagram.com/kpcarss" external>Instagram</FooterLink>
@@ -3100,11 +3144,11 @@ function FooterLink({ children, href, onClick, external }) {
 /* ─────────────────────────────────────────────
    WHATSAPP FLOATING BUTTON
    ───────────────────────────────────────────── */
-function WhatsAppButton() {
-  // Número en formato internacional sin espacios ni símbolos.
+function WhatsAppButton({ user }) {
+  // Con sesión iniciada es un conductor: va a la central. Sin sesión: va al número de consultas.
   // wa.me es la URL oficial de WhatsApp: en mobile abre la app, en desktop abre WhatsApp Web.
-  const phone = "541123850982";
-  const message = "¡Hola! Me interesa alquilar un auto con KPCars.";
+  const phone = user ? WHATSAPP_DRIVERS : WHATSAPP_PUBLIC;
+  const message = user ? "¡Hola! Soy conductor de KPCars y tengo una consulta." : "¡Hola! Me interesa alquilar un auto con KPCars.";
   const href = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 
   return (
