@@ -140,23 +140,31 @@ const LogoutIcon = ({ size = 18 }) => (
   </svg>
 );
 
-const TruckIcon = ({ size = 24 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="1" y="3" width="15" height="13" />
-    <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
-    <circle cx="5.5" cy="18.5" r="2.5" />
-    <circle cx="18.5" cy="18.5" r="2.5" />
+/* Íconos de las áreas, dibujados con el lenguaje del logo:
+   formas macizas, cortes en diagonal, una curva redonda y puntitos. */
+const RentalsIcon = ({ size = 24 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+    <path fillRule="evenodd" d="M1.5 17.5 V12.6 L5 11.6 L9 6.5 H15.2 L19.6 11.4 L22.5 12.4 V17.5 H20.5 A3.1 3.1 0 0 0 14.3 17.5 H9.7 A3.1 3.1 0 0 0 3.5 17.5 Z M9.9 8.6 L7.6 11.5 H11.6 V8.6 Z M13.4 8.6 V11.5 H17.2 L14.5 8.6 Z M4.4 17.7 a2.2 2.2 0 1 0 4.4 0 a2.2 2.2 0 1 0 -4.4 0 Z M5.75 17.7 a0.85 0.85 0 1 0 1.7 0 a0.85 0.85 0 1 0 -1.7 0 Z M15.2 17.7 a2.2 2.2 0 1 0 4.4 0 a2.2 2.2 0 1 0 -4.4 0 Z M16.55 17.7 a0.85 0.85 0 1 0 1.7 0 a0.85 0.85 0 1 0 -1.7 0 Z" />
   </svg>
 );
 
-const LifebuoyIcon = ({ size = 24 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10" />
-    <circle cx="12" cy="12" r="4" />
-    <line x1="4.93" y1="4.93" x2="9.17" y2="9.17" />
-    <line x1="14.83" y1="14.83" x2="19.07" y2="19.07" />
-    <line x1="14.83" y1="9.17" x2="19.07" y2="4.93" />
-    <line x1="4.93" y1="19.07" x2="9.17" y2="14.83" />
+const FletesIcon = ({ size = 24 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+    <path fillRule="evenodd" d="M1.5 5.5 H13.8 V17.5 H8.9 A3.1 3.1 0 0 0 2.7 17.5 H1.5 Z M15.2 8.5 H19.2 L22.5 11.8 V17.5 H21.5 A3.1 3.1 0 0 0 15.3 17.5 H15.2 Z M17 10.4 V12.6 H20.6 L18.4 10.4 Z M3.6 17.7 a2.2 2.2 0 1 0 4.4 0 a2.2 2.2 0 1 0 -4.4 0 Z M4.95 17.7 a0.85 0.85 0 1 0 1.7 0 a0.85 0.85 0 1 0 -1.7 0 Z M16.2 17.7 a2.2 2.2 0 1 0 4.4 0 a2.2 2.2 0 1 0 -4.4 0 Z M17.55 17.7 a0.85 0.85 0 1 0 1.7 0 a0.85 0.85 0 1 0 -1.7 0 Z" />
+  </svg>
+);
+
+/* Gancho de remolque: recuerda a la "P" del logo */
+const AuxiliosIcon = ({ size = 24 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <g transform="translate(-1.4 0.9) scale(0.92)">
+      <mask id="kp-hook-mask">
+        <rect x="-6" y="-6" width="40" height="40" fill="#fff" />
+        <circle cx="13.2" cy="4.5" r="0.95" fill="#000" />
+        <circle cx="4.94" cy="16.25" r="0.85" fill="#000" />
+      </mask>
+      <path mask="url(#kp-hook-mask)" stroke="currentColor" strokeWidth="3.4" strokeLinecap="butt" d="M13.2 2 V9.6 a5.6 5.6 0 1 1 -8.6 4.7" />
+    </g>
   </svg>
 );
 
@@ -296,9 +304,9 @@ const pageTitles = {
 
 /* Áreas de KPCars. Rentals es la principal (es el inicio); las demás están en preparación. */
 const areas = [
-  { key: "rentals", name: "KPCars Rentals", icon: <CarIcon size={22} opacity={1} />, desc: "Alquiler de vehículos Toyota para trabajar en aplicaciones o de forma particular.", page: "catalog", cta: "Ver flota →" },
-  { key: "fletes", name: "KPCars Fletes", icon: <TruckIcon size={22} />, page: "fletes", soon: true },
-  { key: "auxilios", name: "KPCars Auxilios", icon: <LifebuoyIcon size={22} />, page: "auxilios", soon: true },
+  { key: "rentals", name: "KPCars Rentals", Icon: RentalsIcon, desc: "Alquiler de vehículos Toyota para trabajar en aplicaciones o de forma particular.", page: "catalog", cta: "Ver flota →" },
+  { key: "fletes", name: "KPCars Fletes", Icon: FletesIcon, page: "fletes", soon: true },
+  { key: "auxilios", name: "KPCars Auxilios", Icon: AuxiliosIcon, page: "auxilios", soon: true },
 ];
 
 export default function KPCarsApp() {
@@ -885,7 +893,7 @@ function HomePage({ navigate, user }) {
           {areas.map((a) => (
             <div key={a.key} className="home-card area-card" onClick={() => navigate(a.page)} style={{ cursor: "pointer", display: "flex", flexDirection: "column" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
-                <div style={{ width: 42, height: 42, background: "rgba(235,136,0,0.1)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", color: theme.orange }}>{a.icon}</div>
+                <div style={{ width: 42, height: 42, background: "rgba(235,136,0,0.1)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", color: theme.orange }}><a.Icon size={27} /></div>
                 {a.soon && <SoonBadge />}
               </div>
               <h3 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.1rem", letterSpacing: -0.5, marginBottom: 8, color: theme.white }}>{a.name}</h3>
@@ -991,7 +999,7 @@ function ComingSoonPage({ area, navigate }) {
     <div style={{ minHeight: "78vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "130px 20px 80px", position: "relative", overflow: "hidden" }}>
       <div style={{ position: "absolute", top: "10%", left: "50%", transform: "translateX(-50%)", width: 600, height: 600, background: "radial-gradient(circle, rgba(235,136,0,0.08) 0%, transparent 65%)", pointerEvents: "none" }} />
       <div className="anim-in" style={{ textAlign: "center", maxWidth: 560, position: "relative" }}>
-        <div style={{ width: 64, height: 64, margin: "0 auto 24px", background: "rgba(235,136,0,0.1)", border: "1px solid rgba(235,136,0,0.25)", borderRadius: 16, display: "flex", alignItems: "center", justifyContent: "center", color: theme.orange }}>{area.icon}</div>
+        <div style={{ width: 64, height: 64, margin: "0 auto 24px", background: "rgba(235,136,0,0.1)", border: "1px solid rgba(235,136,0,0.25)", borderRadius: 16, display: "flex", alignItems: "center", justifyContent: "center", color: theme.orange }}><area.Icon size={38} /></div>
         <SectionLabel>{area.name}</SectionLabel>
         <h1 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "clamp(2.2rem, 8vw, 4rem)", letterSpacing: -2, lineHeight: 1.05, marginBottom: 18 }}>
           Próxima<span style={{ color: theme.orange }}>mente…</span>
