@@ -779,6 +779,26 @@ function HomePage({ navigate, user }) {
         </div>
       </div>
 
+      {/* ── Áreas de KPCars ── */}
+      <div className="home-section">
+        <SectionHeader label="KPCars" title="Nuestros servicios">
+          KPCars Rentals es nuestra área principal. Muy pronto sumamos fletes y auxilios.
+        </SectionHeader>
+        <div className="features-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+          {areas.map((a) => (
+            <div key={a.key} className="home-card area-card" onClick={() => navigate(a.page)} style={{ cursor: "pointer", display: "flex", flexDirection: "column" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
+                <div style={{ width: 42, height: 42, background: "rgba(235,136,0,0.1)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", color: theme.orange }}>{a.icon}</div>
+                {a.soon && <SoonBadge />}
+              </div>
+              <h3 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.1rem", letterSpacing: -0.5, marginBottom: 8, color: theme.white }}>{a.name}</h3>
+              <p style={{ fontSize: "0.86rem", color: theme.gray400, lineHeight: 1.65, flex: 1 }}>{a.soon ? "Próximamente…" : a.desc}</p>
+              {a.cta && <div style={{ marginTop: 16, fontSize: "0.88rem", fontWeight: 700, color: theme.orange }}>{a.cta}</div>}
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* ── Cómo funciona ── */}
       <div className="home-section">
         <SectionHeader label="El proceso" title={<>Tres pasos para<br />estar en la calle</>}>
@@ -826,26 +846,6 @@ function HomePage({ navigate, user }) {
             <div key={p.name} className="home-card">
               <h3 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.1rem", color: theme.white, letterSpacing: -0.5, marginBottom: 8 }}>{p.name}</h3>
               <p style={{ fontSize: "0.86rem", color: theme.gray400, lineHeight: 1.6 }}>{p.desc}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Áreas de KPCars ── */}
-      <div className="home-section">
-        <SectionHeader label="KPCars" title="Nuestros servicios">
-          KPCars Rentals es nuestra área principal. Muy pronto sumamos fletes y auxilios.
-        </SectionHeader>
-        <div className="features-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
-          {areas.map((a) => (
-            <div key={a.key} className="home-card area-card" onClick={() => navigate(a.page)} style={{ cursor: "pointer", display: "flex", flexDirection: "column" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
-                <div style={{ width: 42, height: 42, background: "rgba(235,136,0,0.1)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", color: theme.orange }}>{a.icon}</div>
-                {a.soon && <SoonBadge />}
-              </div>
-              <h3 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.1rem", letterSpacing: -0.5, marginBottom: 8, color: theme.white }}>{a.name}</h3>
-              <p style={{ fontSize: "0.86rem", color: theme.gray400, lineHeight: 1.65, flex: 1 }}>{a.soon ? "Próximamente…" : a.desc}</p>
-              {a.cta && <div style={{ marginTop: 16, fontSize: "0.88rem", fontWeight: 700, color: theme.orange }}>{a.cta}</div>}
             </div>
           ))}
         </div>
