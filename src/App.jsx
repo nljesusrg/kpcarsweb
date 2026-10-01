@@ -246,10 +246,15 @@ const pagePaths = {
   apply: "/quiero-manejar",
   login: "/conductores",
   "change-password": "/cambiar-contrasena",
-  dashboard: "/panel",
+  dashboard: "/panel/perfil",
   turnos: "/turnos",
 };
-const pathPages = Object.fromEntries(Object.entries(pagePaths).map(([p, path]) => [path, p]));
+const pathPages = {
+  ...Object.fromEntries(Object.entries(pagePaths).map(([p, path]) => [path, p])),
+  // Las pestañas del panel son todas la sección "dashboard"
+  "/panel": "dashboard",
+  "/panel/turnos": "dashboard",
+};
 
 const pageTitles = {
   home: "KPCars — Alquiler de autos para conductores en Buenos Aires",
@@ -287,6 +292,9 @@ export default function KPCarsApp() {
     else routerNavigate(path);
   };
 
+  // Después de iniciar sesión: volver a la página privada que se quiso abrir, o al panel
+  const goAfterLogin = () => routerNavigate(location.state?.from || pagePaths.dashboard, { replace: true });
+
   // Función auxiliar para hacer requests autenticados a la API
   const apiFetch = async (endpoint, options = {}) => {
     const currentToken = token || localStorage.getItem("kpcars_token");
@@ -304,7 +312,11 @@ export default function KPCarsApp() {
       setToken(null);
       localStorage.removeItem("kpcars_user");
       localStorage.removeItem("kpcars_token");
-      navigate("login");
+      // Guarda dónde estaba, para volver ahí al iniciar sesión de nuevo.
+      // Varios pedidos pueden dar 401 a la vez: solo el primero navega, así no se pisa el "from".
+      if (window.location.pathname !== pagePaths.login) {
+        routerNavigate(pagePaths.login, { state: { from: window.location.pathname } });
+      }
       throw new Error("Sesión expirada. Inicia sesión de nuevo.");
     }
     if (res.status === 403) {
@@ -390,7 +402,7 @@ export default function KPCarsApp() {
       if (loginData.must_change_password) {
         navigate("change-password");
       } else {
-        navigate("dashboard");
+        goAfterLogin();
       }
     } catch (err) {
       // Si falla todo, usamos los datos que ya vienen en la respuesta del login
@@ -415,7 +427,7 @@ export default function KPCarsApp() {
       if (loginData.must_change_password) {
         navigate("change-password");
       } else {
-        navigate("dashboard");
+        goAfterLogin();
       }
     }
   };
@@ -538,11 +550,14 @@ export default function KPCarsApp() {
         <Route path="/" element={<HomePage navigate={navigate} user={user} />} />
         <Route path="/flota" element={<CatalogPage navigate={navigate} user={user} />} />
         <Route path="/quiero-manejar" element={<ApplyPage />} />
-        <Route path="/conductores" element={user ? <Navigate to="/panel" replace /> : <LoginPage onLogin={handleLogin} />} />
-        {/* Páginas privadas: sin sesión, van a Zona Conductores */}
-        <Route path="/cambiar-contrasena" element={user ? <ChangePasswordPage user={user} token={token} onComplete={handlePasswordChanged} /> : <Navigate to="/conductores" replace />} />
-        <Route path="/panel" element={user ? <DashboardPage user={user} navigate={navigate} apiFetch={apiFetch} onUserUpdate={(updated) => { setUser(updated); localStorage.setItem("kpcars_user", JSON.stringify(updated)); }} /> : <Navigate to="/conductores" replace />} />
-        <Route path="/turnos" element={user ? <TurnosPage user={user} apiFetch={apiFetch} navigate={navigate} /> : <Navigate to="/conductores" replace />} />
+        <Route path="/conductores" element={user ? <Navigate to={location.state?.from || pagePaths.dashboard} replace /> : <LoginPage onLogin={handleLogin} />} />
+        {/* Páginas privadas: sin sesión, van a Zona Conductores (ver <Private>) */}
+        <Route path="/cambiar-contrasena" element={<Private user={user}><ChangePasswordPage user={user} token={token} onComplete={handlePasswordChanged} /></Private>} />
+        <Route path="/panel" element={<Navigate to={pagePaths.dashboard} replace />} />
+        {["perfil", "turnos"].map((tab) => (
+          <Route key={tab} path={`/panel/${tab}`} element={<Private user={user}><DashboardPage tab={tab} user={user} navigate={navigate} apiFetch={apiFetch} onUserUpdate={(updated) => { setUser(updated); localStorage.setItem("kpcars_user", JSON.stringify(updated)); }} /></Private>} />
+        ))}
+        <Route path="/turnos" element={<Private user={user}><TurnosPage user={user} apiFetch={apiFetch} navigate={navigate} /></Private>} />
         {/* Dirección desconocida: al inicio (la página 404 llega en la Etapa 3) */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
@@ -552,6 +567,12 @@ export default function KPCarsApp() {
       <WhatsAppButton />
     </div>
   );
+}
+
+/* Página privada: sin sesión manda a Zona Conductores y recuerda a dónde se quería entrar */
+function Private({ user, children }) {
+  const location = useLocation();
+  return user ? children : <Navigate to={pagePaths.login} replace state={{ from: location.pathname }} />;
 }
 
 /* ─────────────────────────────────────────────
@@ -1434,8 +1455,10 @@ function VencimientosBanner({ user }) {
 /* ─────────────────────────────────────────────
    DASHBOARD PAGE (PANEL DEL CONDUCTOR)
    ───────────────────────────────────────────── */
-function DashboardPage({ user, navigate, apiFetch, onUserUpdate }) {
-  const [tab, setTab] = useState("perfil");
+function DashboardPage({ tab, user, navigate, apiFetch, onUserUpdate }) {
+  // Cada pestaña tiene su dirección: /panel/perfil y /panel/turnos
+  const routerNavigate = useNavigate();
+  const setTab = (t) => routerNavigate(`/panel/${t}`);
 
   return (
     <div style={{ paddingTop: 84, maxWidth: 900, margin: "0 auto", padding: "84px 20px 80px" }}>
