@@ -633,7 +633,9 @@ function Nav({ page, navigate, menuOpen, setMenuOpen, user, onLogout }) {
         {/* Desktop links */}
         <div style={{ display: "flex", gap: 6, alignItems: "center" }} className="desktop-nav">
           <a style={s.link(page === "home")} onClick={() => navigate("home")}>Inicio</a>
-          <a style={s.link(page === "catalog")} onClick={() => navigate("catalog")}>Flota</a>
+          {areas.map((a) => (
+            <a key={a.key} style={s.link(page === a.page)} onClick={() => navigate(a.page)}>{a.name.replace("KPCars ", "")}</a>
+          ))}
           {!user && <a style={s.cta} onClick={() => navigate("apply")}>Quiero manejar</a>}
           {user ? (
             <>
@@ -661,7 +663,9 @@ function Nav({ page, navigate, menuOpen, setMenuOpen, user, onLogout }) {
           <div onClick={() => setMenuOpen(false)} style={{ position: "fixed", inset: 0, top: 64, zIndex: 98 }} />
           <div style={{ ...s.mobileLinks, zIndex: 99, position: "absolute" }}>
             <a style={s.link(page === "home")} onClick={() => navigate("home")}>Inicio</a>
-            <a style={s.link(page === "catalog")} onClick={() => navigate("catalog")}>Flota</a>
+            {areas.map((a) => (
+            <a key={a.key} style={s.link(page === a.page)} onClick={() => navigate(a.page)}>{a.name.replace("KPCars ", "")}</a>
+          ))}
             <div style={{ height: 1, background: "rgba(255,255,255,0.06)", margin: "6px 0" }} />
             {user ? (
               <>
@@ -684,8 +688,8 @@ function Nav({ page, navigate, menuOpen, setMenuOpen, user, onLogout }) {
       )}
 
       <style>{`
-        @media (min-width: 769px) { .mobile-hamburger { display: none !important; } }
-        @media (max-width: 768px) { .desktop-nav { display: none !important; } .mobile-hamburger { display: flex !important; } }
+        @media (min-width: 901px) { .mobile-hamburger { display: none !important; } }
+        @media (max-width: 900px) { .desktop-nav { display: none !important; } .mobile-hamburger { display: flex !important; } }
       `}</style>
     </nav>
   );
@@ -779,26 +783,6 @@ function HomePage({ navigate, user }) {
         </div>
       </div>
 
-      {/* ── Áreas de KPCars ── */}
-      <div className="home-section">
-        <SectionHeader label="KPCars" title="Nuestros servicios">
-          KPCars Rentals es nuestra área principal. Muy pronto sumamos fletes y auxilios.
-        </SectionHeader>
-        <div className="features-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
-          {areas.map((a) => (
-            <div key={a.key} className="home-card area-card" onClick={() => navigate(a.page)} style={{ cursor: "pointer", display: "flex", flexDirection: "column" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
-                <div style={{ width: 42, height: 42, background: "rgba(235,136,0,0.1)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", color: theme.orange }}>{a.icon}</div>
-                {a.soon && <SoonBadge />}
-              </div>
-              <h3 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.1rem", letterSpacing: -0.5, marginBottom: 8, color: theme.white }}>{a.name}</h3>
-              <p style={{ fontSize: "0.86rem", color: theme.gray400, lineHeight: 1.65, flex: 1 }}>{a.soon ? "Próximamente…" : a.desc}</p>
-              {a.cta && <div style={{ marginTop: 16, fontSize: "0.88rem", fontWeight: 700, color: theme.orange }}>{a.cta}</div>}
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* ── Cómo funciona ── */}
       <div className="home-section">
         <SectionHeader label="El proceso" title={<>Tres pasos para<br />estar en la calle</>}>
@@ -846,6 +830,26 @@ function HomePage({ navigate, user }) {
             <div key={p.name} className="home-card">
               <h3 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.1rem", color: theme.white, letterSpacing: -0.5, marginBottom: 8 }}>{p.name}</h3>
               <p style={{ fontSize: "0.86rem", color: theme.gray400, lineHeight: 1.6 }}>{p.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Áreas de KPCars ── */}
+      <div className="home-section">
+        <SectionHeader label="KPCars" title="Nuestros servicios">
+          KPCars Rentals es nuestra área principal. Muy pronto sumamos fletes y auxilios.
+        </SectionHeader>
+        <div className="features-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+          {areas.map((a) => (
+            <div key={a.key} className="home-card area-card" onClick={() => navigate(a.page)} style={{ cursor: "pointer", display: "flex", flexDirection: "column" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
+                <div style={{ width: 42, height: 42, background: "rgba(235,136,0,0.1)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", color: theme.orange }}>{a.icon}</div>
+                {a.soon && <SoonBadge />}
+              </div>
+              <h3 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.1rem", letterSpacing: -0.5, marginBottom: 8, color: theme.white }}>{a.name}</h3>
+              <p style={{ fontSize: "0.86rem", color: theme.gray400, lineHeight: 1.65, flex: 1 }}>{a.soon ? "Próximamente…" : a.desc}</p>
+              {a.cta && <div style={{ marginTop: 16, fontSize: "0.88rem", fontWeight: 700, color: theme.orange }}>{a.cta}</div>}
             </div>
           ))}
         </div>
