@@ -749,14 +749,13 @@ function HomePage({ navigate, user }) {
         <div style={{ maxWidth: 1200, margin: "0 auto", padding: "60px 20px", width: "100%" }}>
           {/* Badge */}
           <div className="anim-in" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 14px", background: "rgba(235,136,0,0.1)", border: "1px solid rgba(235,136,0,0.25)", borderRadius: 100, marginBottom: 28 }}>
-            <span style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: 2, color: theme.orange, textTransform: "uppercase" }}>KPCars Rentals · Alquiler de vehículos</span>
+            <span style={{ fontSize: "clamp(0.62rem, 2.9vw, 0.72rem)", fontWeight: 700, letterSpacing: 1.5, color: theme.orange, textTransform: "uppercase", whiteSpace: "nowrap" }}>KPCars Rentals · Alquiler de vehículos</span>
           </div>
 
           {/* Titular */}
-          <h1 className="anim-in d1" style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "clamp(2.6rem, 8vw, 5rem)", lineHeight: 1.0, letterSpacing: -2, marginBottom: 22, maxWidth: 720 }}>
-            Alquila.<br />
-            Maneja.<br />
-            <span style={{ color: theme.orange }}>Genera.</span>
+          <h1 className="anim-in d1" style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "clamp(2rem, 7.6vw, 4.2rem)", lineHeight: 1.04, letterSpacing: -2, marginBottom: 22, maxWidth: 820 }}>
+            Movemos personas,<br />
+            <span style={{ color: theme.orange }}>impulsamos oportunidades.</span>
           </h1>
 
           <p className="anim-in d2" style={{ fontSize: "1.05rem", color: theme.gray300, lineHeight: 1.65, marginBottom: 36, maxWidth: 480 }}>
