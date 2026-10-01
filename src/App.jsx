@@ -783,6 +783,9 @@ function HomePage({ navigate, user }) {
         </div>
       </div>
 
+      {/* ── Carrusel de la flota ── */}
+      <FleetCarousel navigate={navigate} />
+
       {/* ── Cómo funciona ── */}
       <div className="home-section">
         <SectionHeader label="El proceso" title={<>Tres pasos para<br />estar en la calle</>}>
@@ -857,6 +860,82 @@ function HomePage({ navigate, user }) {
 
       {/* CTA */}
       {!user && <CTABanner navigate={navigate} />}
+    </div>
+  );
+}
+
+/* Carrusel con los autos disponibles de la flota. Lo mueve la persona: flechas en PC, dedo en celular. */
+function FleetCarousel({ navigate }) {
+  const trackRef = useRef(null);
+  const [canPrev, setCanPrev] = useState(false);
+  const [canNext, setCanNext] = useState(true);
+  const available = cars.filter((c) => !c.rented);
+
+  const updateArrows = () => {
+    const t = trackRef.current;
+    if (!t) return;
+    setCanPrev(t.scrollLeft > 4);
+    setCanNext(t.scrollLeft + t.clientWidth < t.scrollWidth - 4);
+  };
+
+  const move = (dir) => {
+    const t = trackRef.current;
+    const slide = t?.querySelector(".fleet-slide");
+    if (slide) t.scrollBy({ left: dir * (slide.offsetWidth + 16), behavior: "smooth" });
+  };
+
+  const arrow = (enabled) => ({ width: 42, height: 42, borderRadius: 12, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: theme.white, cursor: enabled ? "pointer" : "default", opacity: enabled ? 1 : 0.35, display: "flex", alignItems: "center", justifyContent: "center" });
+
+  return (
+    <div className="home-section">
+      <style>{`
+        .fleet-track { display: flex; gap: 16px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+        .fleet-track::-webkit-scrollbar { display: none; }
+        .fleet-slide { flex: 0 0 calc((100% - 32px) / 3); scroll-snap-align: start; background: ${theme.gray900}; border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; overflow: hidden; cursor: pointer; transition: border-color 0.15s; }
+        .fleet-slide:hover { border-color: rgba(235,136,0,0.35); }
+        .fleet-slide img { transition: transform 0.4s ease; }
+        .fleet-slide:hover img { transform: scale(1.04); }
+        @media (max-width: 900px) { .fleet-slide { flex-basis: calc((100% - 16px) / 2); } }
+        @media (max-width: 640px) { .fleet-slide { flex-basis: 84%; } .fleet-arrows { display: none !important; } }
+      `}</style>
+
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: "12px 32px", marginBottom: 36 }}>
+        <div>
+          <SectionLabel>Nuestra flota</SectionLabel>
+          <h2 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "clamp(1.6rem, 5vw, 2.6rem)", letterSpacing: -1, lineHeight: 1.1 }}>Autos listos<br />para trabajar</h2>
+        </div>
+        <div className="fleet-arrows" style={{ display: "flex", gap: 8 }}>
+          <button aria-label="Autos anteriores" disabled={!canPrev} onClick={() => move(-1)} style={arrow(canPrev)}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+          </button>
+          <button aria-label="Autos siguientes" disabled={!canNext} onClick={() => move(1)} style={arrow(canNext)}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+          </button>
+        </div>
+      </div>
+
+      <div ref={trackRef} className="fleet-track" onScroll={updateArrows}>
+        {available.map((car, i) => (
+          <div key={i} className="fleet-slide" onClick={() => navigate("catalog")}>
+            <div style={{ width: "100%", aspectRatio: "16/10", background: `linear-gradient(135deg, ${theme.gray800}, ${theme.gray700})`, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
+              {car.image ? <img src={car.image} alt={`${car.model} ${car.variant}`} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : <CarIcon size={56} />}
+              <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 50, background: `linear-gradient(to top, ${theme.gray900}, transparent)` }} />
+            </div>
+            <div style={{ padding: 22 }}>
+              <div style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.1rem", marginBottom: 4 }}>{car.model}</div>
+              <div style={{ fontSize: "0.82rem", color: theme.gray400, marginBottom: 14 }}>{car.variant} · {car.year}</div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 4, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                <span style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.25rem", color: theme.orange }}>${car.priceWeekly}</span>
+                <span style={{ fontSize: "0.78rem", color: theme.gray400 }}>ARS / semana</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginTop: 28 }}>
+        <Btn variant="secondary" onClick={() => navigate("catalog")}>Ver toda la flota →</Btn>
+      </div>
     </div>
   );
 }
