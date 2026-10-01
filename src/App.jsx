@@ -662,9 +662,13 @@ function Nav({ page, navigate, menuOpen, setMenuOpen, user, onLogout }) {
    ───────────────────────────────────────────── */
 function HomePage({ navigate, user }) {
   const stats = [
-    { number: "100%", label: "Flota Toyota" },
-    { number: "BA", label: "Buenos Aires" },
+    { icon: <CarIcon size={20} opacity={1} />, title: "100% Toyota", label: "Corolla y Etios" },
+    { icon: <WrenchIcon size={20} />, title: "Taller propio", label: "Service y mantenimiento" },
+    { icon: <CoinIcon size={20} />, title: "Pago semanal", label: "Fijo, sin sorpresas" },
   ];
+
+  // Auto que se muestra en la portada (el Corolla blanco: resalta sobre el fondo negro)
+  const heroCar = cars[cars.length - 1];
 
   const features = [
     { icon: <CarIcon size={22} opacity={1} />, title: "Flota 100% Toyota", desc: "Corolla y Etios modelos 2016–2019: vehículos confiables, económicos y con respaldo de la marca más vendida de Argentina." },
@@ -684,13 +688,20 @@ function HomePage({ navigate, user }) {
   return (
     <div>
       <style>{`
-        @media (max-width: 640px) {
-          .hero-grid { grid-template-columns: 1fr !important; }
-          .steps-grid { grid-template-columns: 1fr !important; }
-          .features-grid { grid-template-columns: 1fr !important; }
-        }
+        .home-card { background: ${theme.gray900}; border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; padding: 28px; }
+        .home-section { max-width: 1200px; margin: 0 auto; padding: 56px 20px; }
+        .hero-photo img { transition: transform 0.5s ease; }
+        .hero-photo:hover img { transform: scale(1.03); }
         @media (max-width: 900px) {
+          .hero-grid { grid-template-columns: 1fr !important; gap: 36px !important; }
+          .hero-photo { aspect-ratio: 1 / 1 !important; }
           .features-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .steps-grid { grid-template-columns: 1fr !important; }
+        }
+        @media (max-width: 640px) {
+          .features-grid { grid-template-columns: 1fr !important; }
+          .home-section { padding: 40px 20px; }
+          .home-card { padding: 24px; }
         }
       `}</style>
 
@@ -699,10 +710,10 @@ function HomePage({ navigate, user }) {
         {/* Gradientes de fondo */}
         <div style={{ position: "absolute", top: "-20%", right: "-10%", width: 700, height: 700, background: "radial-gradient(circle, rgba(235,136,0,0.09) 0%, transparent 65%)", pointerEvents: "none" }} />
         <div style={{ position: "absolute", bottom: "-10%", left: "-10%", width: 500, height: 500, background: "radial-gradient(circle, rgba(235,136,0,0.05) 0%, transparent 65%)", pointerEvents: "none" }} />
-        {/* Logo decorativo */}
-        <img src={kpLogo} alt="" style={{ position: "absolute", right: "-4%", top: "50%", transform: "translateY(-50%)", height: "75vh", opacity: 0.035, pointerEvents: "none", userSelect: "none" }} />
 
         <div style={{ maxWidth: 1200, margin: "0 auto", padding: "60px 20px", width: "100%" }}>
+         <div className="hero-grid" style={{ display: "grid", gridTemplateColumns: "1.15fr 0.85fr", gap: 56, alignItems: "center", marginBottom: 56 }}>
+          <div>
           {/* Badge */}
           <div className="anim-in" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 14px", background: "rgba(235,136,0,0.1)", border: "1px solid rgba(235,136,0,0.25)", borderRadius: 100, marginBottom: 28 }}>
             <span style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: 2, color: theme.orange, textTransform: "uppercase" }}>Alquiler de vehículos · Buenos Aires</span>
@@ -719,17 +730,37 @@ function HomePage({ navigate, user }) {
             Alquilá uno de nuestros vehículos y trabajá en Uber, Didi, Cabify o donde quieras. Vos ponés las ganas, nosotros ponemos el auto.
           </p>
 
-          <div className="anim-in d3" style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 72 }}>
+          <div className="anim-in d3" style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
             <Btn onClick={() => navigate("catalog")}>Ver flota →</Btn>
             {!user && <Btn variant="secondary" onClick={() => navigate("apply")}>Quiero manejar</Btn>}
           </div>
+          </div>
 
-          {/* Stats en línea */}
-          <div className="anim-in d3" style={{ display: "flex", gap: 0, flexWrap: "wrap", borderTop: "1px solid rgba(255,255,255,0.07)", paddingTop: 32 }}>
-            {stats.map((s, i) => (
-              <div key={i} style={{ paddingRight: 40, marginRight: 40, borderRight: i < stats.length - 1 ? "1px solid rgba(255,255,255,0.07)" : "none", paddingBottom: 8 }}>
-                <div style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "clamp(1.6rem, 3vw, 2.2rem)", color: theme.white, lineHeight: 1 }}>{s.number}</div>
-                <div style={{ fontSize: "0.75rem", color: theme.gray500, fontWeight: 500, marginTop: 4, letterSpacing: 0.5 }}>{s.label}</div>
+          {/* Foto de un auto de la flota */}
+          <div className="anim-in d2 hero-photo" onClick={() => navigate("catalog")} style={{ position: "relative", aspectRatio: "4 / 5", borderRadius: 24, overflow: "hidden", border: "1px solid rgba(255,255,255,0.08)", background: theme.gray900, cursor: "pointer" }}>
+            <img src={heroCar.image} alt={`${heroCar.model} de la flota de KPCars`} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 52%", display: "block" }} />
+            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(10,10,10,0.95) 0%, rgba(10,10,10,0.6) 22%, transparent 55%)", pointerEvents: "none" }} />
+            <div style={{ position: "absolute", left: 20, right: 20, bottom: 20, display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+              <div>
+                <div style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.1rem", letterSpacing: -0.5 }}>{heroCar.model}</div>
+                <div style={{ fontSize: "0.8rem", color: theme.gray300, marginTop: 2 }}>{heroCar.variant} · {heroCar.year}</div>
+              </div>
+              <div style={{ background: theme.orange, color: theme.black, borderRadius: 10, padding: "8px 12px", fontWeight: 700, fontSize: "0.9rem", whiteSpace: "nowrap" }}>
+                ${heroCar.priceWeekly} <span style={{ fontWeight: 500, fontSize: "0.75rem" }}>/ semana</span>
+              </div>
+            </div>
+          </div>
+         </div>
+
+          {/* Datos destacados */}
+          <div className="anim-in d3" style={{ display: "flex", gap: "20px 40px", flexWrap: "wrap", borderTop: "1px solid rgba(255,255,255,0.07)", paddingTop: 28 }}>
+            {stats.map((s) => (
+              <div key={s.title} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ width: 40, height: 40, flexShrink: 0, background: "rgba(235,136,0,0.1)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", color: theme.orange }}>{s.icon}</div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: "0.95rem", color: theme.white, lineHeight: 1.2 }}>{s.title}</div>
+                  <div style={{ fontSize: "0.78rem", color: theme.gray400, marginTop: 2 }}>{s.label}</div>
+                </div>
               </div>
             ))}
           </div>
@@ -737,71 +768,52 @@ function HomePage({ navigate, user }) {
       </div>
 
       {/* ── Cómo funciona ── */}
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "80px 20px" }}>
-        <div style={{ marginBottom: 52 }}>
-          <SectionLabel>El proceso</SectionLabel>
-          <SectionTitle>Tres pasos para<br />estar en la calle</SectionTitle>
-        </div>
-        <div className="steps-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2, background: "rgba(255,255,255,0.05)", borderRadius: 20, overflow: "hidden" }}>
-          {steps.map((s, i) => (
-            <div key={i} style={{ background: theme.black, padding: "36px 32px", position: "relative" }}>
-              <div style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "3.5rem", color: "rgba(235,136,0,0.12)", lineHeight: 1, marginBottom: 20, letterSpacing: -2 }}>{s.n}</div>
-              <h3 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.1rem", marginBottom: 10, color: theme.white }}>{s.title}</h3>
-              <p style={{ fontSize: "0.88rem", color: theme.gray400, lineHeight: 1.65 }}>{s.desc}</p>
-              {i < steps.length - 1 && (
-                <div style={{ position: "absolute", top: "50%", right: -12, transform: "translateY(-50%)", width: 24, height: 24, background: theme.black, border: "1px solid rgba(255,255,255,0.08)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1 }}>
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M3 2l4 3-4 3" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                </div>
-              )}
+      <div className="home-section">
+        <SectionHeader label="El proceso" title={<>Tres pasos para<br />estar en la calle</>}>
+          Del formulario a la entrega del auto, te acompañamos en cada paso.
+        </SectionHeader>
+        <div className="steps-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+          {steps.map((s) => (
+            <div key={s.n} className="home-card">
+              <div style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "2.4rem", color: theme.orange, lineHeight: 1, marginBottom: 18, letterSpacing: -1 }}>{s.n}</div>
+              <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: 8, color: theme.white }}>{s.title}</h3>
+              <p style={{ fontSize: "0.86rem", color: theme.gray400, lineHeight: 1.65 }}>{s.desc}</p>
             </div>
           ))}
         </div>
       </div>
 
       {/* ── Por qué KPCars ── */}
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "40px 20px 80px" }}>
-        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 20, marginBottom: 48 }}>
-          <div>
-            <SectionLabel>Por qué KPCars</SectionLabel>
-            <SectionTitle>Todo lo que necesitas<br />para empezar</SectionTitle>
-          </div>
-          <p style={{ fontSize: "0.92rem", color: theme.gray400, maxWidth: 360, lineHeight: 1.65 }}>
-            Nos encargamos de que tengas un auto en condiciones, con papeles al día y listo para generar ingresos desde el día uno.
-          </p>
-        </div>
-        <div className="features-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, background: "rgba(255,255,255,0.05)", borderRadius: 20, overflow: "hidden" }}>
-          {features.map((f, i) => (
-            <div key={i} style={{ background: theme.black, padding: "32px 28px", borderLeft: i % 3 === 0 ? "none" : "none", position: "relative" }}>
+      <div className="home-section">
+        <SectionHeader label="Por qué KPCars" title={<>Todo lo que necesitas<br />para empezar</>}>
+          Nos encargamos de que tengas un auto en condiciones, con papeles al día y listo para generar ingresos desde el día uno.
+        </SectionHeader>
+        <div className="features-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+          {features.map((f) => (
+            <div key={f.title} className="home-card">
               <div style={{ width: 42, height: 42, background: "rgba(235,136,0,0.1)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 18, color: theme.orange }}>{f.icon}</div>
-              <h3 style={{ fontSize: "0.98rem", fontWeight: 700, marginBottom: 8, color: theme.white }}>{f.title}</h3>
-              <p style={{ fontSize: "0.84rem", color: theme.gray400, lineHeight: 1.65 }}>{f.desc}</p>
+              <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: 8, color: theme.white }}>{f.title}</h3>
+              <p style={{ fontSize: "0.86rem", color: theme.gray400, lineHeight: 1.65 }}>{f.desc}</p>
             </div>
           ))}
         </div>
       </div>
 
       {/* ── Plataformas ── */}
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "40px 20px 100px" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16, marginBottom: 36 }}>
-          <div>
-            <SectionLabel>Plataformas compatibles</SectionLabel>
-            <SectionTitle>Trabaja donde quieras</SectionTitle>
-          </div>
-          <p style={{ fontSize: "0.92rem", color: theme.gray400, maxWidth: 340, lineHeight: 1.65 }}>
-            Nuestros autos están habilitados para todas las plataformas de transporte. Sin restricciones.
-          </p>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+      <div className="home-section">
+        <SectionHeader label="Plataformas compatibles" title="Trabaja donde quieras">
+          Nuestros autos están habilitados para todas las plataformas de transporte. Sin restricciones.
+        </SectionHeader>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
           {[
-            { name: "Uber",   color: "#ffffff", bg: "rgba(255,255,255,0.04)", border: "rgba(255,255,255,0.1)",  desc: "La plataforma más usada en Argentina" },
-            { name: "Didi",   color: "#ff6633", bg: "rgba(255,102,51,0.06)",  border: "rgba(255,102,51,0.18)", desc: "Con alta demanda en el AMBA" },
-            { name: "Cabify", color: "#9b59b6", bg: "rgba(155,89,182,0.06)", border: "rgba(155,89,182,0.18)", desc: "Servicio premium con pasajeros frecuentes" },
-            { name: "Particular y más", color: theme.orange, bg: "rgba(235,136,0,0.06)", border: "rgba(235,136,0,0.2)", desc: "Trabajá sin plataforma o con la que elijas" },
+            { name: "Uber", desc: "La plataforma más usada en Argentina" },
+            { name: "Didi", desc: "Con alta demanda en el AMBA" },
+            { name: "Cabify", desc: "Servicio premium con pasajeros frecuentes" },
+            { name: "Particular y más", desc: "Trabajá sin plataforma o con la que elijas" },
           ].map((p) => (
-            <div key={p.name} style={{ background: p.bg, border: `1px solid ${p.border}`, borderRadius: 16, padding: "28px 24px", display: "flex", flexDirection: "column", gap: 8 }}>
-              <div style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.1rem", color: p.color, letterSpacing: -0.5, marginBottom: 2 }}>{p.name}</div>
-              <div style={{ fontSize: "0.8rem", color: theme.gray400, lineHeight: 1.55 }}>{p.desc}</div>
+            <div key={p.name} className="home-card">
+              <h3 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.1rem", color: theme.white, letterSpacing: -0.5, marginBottom: 8 }}>{p.name}</h3>
+              <p style={{ fontSize: "0.86rem", color: theme.gray400, lineHeight: 1.6 }}>{p.desc}</p>
             </div>
           ))}
         </div>
@@ -2812,9 +2824,22 @@ function SectionTitle({ children }) {
   return <h2 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "clamp(1.6rem, 5vw, 2.6rem)", letterSpacing: -1, marginBottom: 14, lineHeight: 1.1 }}>{children}</h2>;
 }
 
+/* Encabezado de sección: etiqueta + título a la izquierda, texto opcional a la derecha */
+function SectionHeader({ label, title, children }) {
+  return (
+    <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: "12px 32px", marginBottom: 36 }}>
+      <div>
+        <SectionLabel>{label}</SectionLabel>
+        <h2 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "clamp(1.6rem, 5vw, 2.6rem)", letterSpacing: -1, lineHeight: 1.1 }}>{title}</h2>
+      </div>
+      {children && <p style={{ fontSize: "0.92rem", color: theme.gray400, maxWidth: 360, lineHeight: 1.65 }}>{children}</p>}
+    </div>
+  );
+}
+
 function CTABanner({ navigate }) {
   return (
-    <div style={{ maxWidth: 1200, margin: "0 auto", padding: "20px 20px 80px" }}>
+    <div style={{ maxWidth: 1200, margin: "0 auto", padding: "56px 20px 80px" }}>
       <div style={{ background: `linear-gradient(135deg, ${theme.orange}, #d47a00)`, borderRadius: 20, padding: "clamp(32px, 6vw, 56px)", textAlign: "center", position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", top: "-50%", right: "-20%", width: 400, height: 400, background: "radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)", pointerEvents: "none" }} />
         <h2 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "clamp(1.4rem, 4vw, 2.2rem)", color: theme.black, marginBottom: 10, position: "relative" }}>¿Listo para empezar a generar?</h2>
