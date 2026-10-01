@@ -667,9 +667,6 @@ function HomePage({ navigate, user }) {
     { icon: <CoinIcon size={20} />, title: "Pago semanal", label: "Fijo, sin sorpresas" },
   ];
 
-  // Auto que se muestra en la portada (el Corolla blanco: resalta sobre el fondo negro)
-  const heroCar = cars[cars.length - 1];
-
   const features = [
     { icon: <CarIcon size={22} opacity={1} />, title: "Flota 100% Toyota", desc: "Corolla y Etios modelos 2016–2019: vehículos confiables, económicos y con respaldo de la marca más vendida de Argentina." },
     { icon: <DocumentIcon size={22} />, title: "Papeles al día", desc: "Seguro, VTV, y toda la documentación necesaria para que manejes tranquilo y sin preocupaciones legales." },
@@ -690,11 +687,7 @@ function HomePage({ navigate, user }) {
       <style>{`
         .home-card { background: ${theme.gray900}; border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; padding: 28px; }
         .home-section { max-width: 1200px; margin: 0 auto; padding: 56px 20px; }
-        .hero-photo img { transition: transform 0.5s ease; }
-        .hero-photo:hover img { transform: scale(1.03); }
         @media (max-width: 900px) {
-          .hero-grid { grid-template-columns: 1fr !important; gap: 36px !important; }
-          .hero-photo { aspect-ratio: 1 / 1 !important; }
           .features-grid { grid-template-columns: repeat(2, 1fr) !important; }
           .steps-grid { grid-template-columns: 1fr !important; }
         }
@@ -710,10 +703,10 @@ function HomePage({ navigate, user }) {
         {/* Gradientes de fondo */}
         <div style={{ position: "absolute", top: "-20%", right: "-10%", width: 700, height: 700, background: "radial-gradient(circle, rgba(235,136,0,0.09) 0%, transparent 65%)", pointerEvents: "none" }} />
         <div style={{ position: "absolute", bottom: "-10%", left: "-10%", width: 500, height: 500, background: "radial-gradient(circle, rgba(235,136,0,0.05) 0%, transparent 65%)", pointerEvents: "none" }} />
+        {/* Logo decorativo */}
+        <img src={kpLogo} alt="" style={{ position: "absolute", right: "-4%", top: "50%", transform: "translateY(-50%)", height: "75vh", opacity: 0.035, pointerEvents: "none", userSelect: "none" }} />
 
         <div style={{ maxWidth: 1200, margin: "0 auto", padding: "60px 20px", width: "100%" }}>
-         <div className="hero-grid" style={{ display: "grid", gridTemplateColumns: "1.15fr 0.85fr", gap: 56, alignItems: "center", marginBottom: 56 }}>
-          <div>
           {/* Badge */}
           <div className="anim-in" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 14px", background: "rgba(235,136,0,0.1)", border: "1px solid rgba(235,136,0,0.25)", borderRadius: 100, marginBottom: 28 }}>
             <span style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: 2, color: theme.orange, textTransform: "uppercase" }}>Alquiler de vehículos · Buenos Aires</span>
@@ -730,27 +723,10 @@ function HomePage({ navigate, user }) {
             Alquilá uno de nuestros vehículos y trabajá en Uber, Didi, Cabify o donde quieras. Vos ponés las ganas, nosotros ponemos el auto.
           </p>
 
-          <div className="anim-in d3" style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <div className="anim-in d3" style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 72 }}>
             <Btn onClick={() => navigate("catalog")}>Ver flota →</Btn>
             {!user && <Btn variant="secondary" onClick={() => navigate("apply")}>Quiero manejar</Btn>}
           </div>
-          </div>
-
-          {/* Foto de un auto de la flota */}
-          <div className="anim-in d2 hero-photo" onClick={() => navigate("catalog")} style={{ position: "relative", aspectRatio: "4 / 5", borderRadius: 24, overflow: "hidden", border: "1px solid rgba(255,255,255,0.08)", background: theme.gray900, cursor: "pointer" }}>
-            <img src={heroCar.image} alt={`${heroCar.model} de la flota de KPCars`} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 52%", display: "block" }} />
-            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(10,10,10,0.95) 0%, rgba(10,10,10,0.6) 22%, transparent 55%)", pointerEvents: "none" }} />
-            <div style={{ position: "absolute", left: 20, right: 20, bottom: 20, display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-              <div>
-                <div style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.1rem", letterSpacing: -0.5 }}>{heroCar.model}</div>
-                <div style={{ fontSize: "0.8rem", color: theme.gray300, marginTop: 2 }}>{heroCar.variant} · {heroCar.year}</div>
-              </div>
-              <div style={{ background: theme.orange, color: theme.black, borderRadius: 10, padding: "8px 12px", fontWeight: 700, fontSize: "0.9rem", whiteSpace: "nowrap" }}>
-                ${heroCar.priceWeekly} <span style={{ fontWeight: 500, fontSize: "0.75rem" }}>/ semana</span>
-              </div>
-            </div>
-          </div>
-         </div>
 
           {/* Datos destacados */}
           <div className="anim-in d3" style={{ display: "flex", gap: "20px 40px", flexWrap: "wrap", borderTop: "1px solid rgba(255,255,255,0.07)", paddingTop: 28 }}>
@@ -965,7 +941,7 @@ function CatalogPage({ navigate, user }) {
                 </select>
               </div>
               <div><label style={labelS}>Año</label><input style={inputS} value={form.year} onChange={fld("year")} placeholder="2017" /></div>
-              <div style={{ gridColumn: "1 / -1" }}><label style={labelS}>Precio semanal (ARS, sin $)</label><input style={inputS} value={form.priceWeekly} onChange={fld("priceWeekly")} placeholder="360.000" /></div>
+              <div style={{ gridColumn: "1 / -1" }}><label style={labelS}>Precio semanal (ARS, sin $)</label><input style={inputS} value={form.priceWeekly} onChange={fld("priceWeekly")} placeholder="400.000" /></div>
             </div>
 
             {/* Foto */}
