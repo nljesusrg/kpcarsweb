@@ -136,6 +136,26 @@ const LogoutIcon = ({ size = 18 }) => (
   </svg>
 );
 
+const TruckIcon = ({ size = 24 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="1" y="3" width="15" height="13" />
+    <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
+    <circle cx="5.5" cy="18.5" r="2.5" />
+    <circle cx="18.5" cy="18.5" r="2.5" />
+  </svg>
+);
+
+const LifebuoyIcon = ({ size = 24 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <circle cx="12" cy="12" r="4" />
+    <line x1="4.93" y1="4.93" x2="9.17" y2="9.17" />
+    <line x1="14.83" y1="14.83" x2="19.07" y2="19.07" />
+    <line x1="14.83" y1="9.17" x2="19.07" y2="4.93" />
+    <line x1="4.93" y1="19.07" x2="9.17" y2="14.83" />
+  </svg>
+);
+
 const UserIcon = ({ size = 18 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -248,6 +268,8 @@ const pagePaths = {
   "change-password": "/cambiar-contrasena",
   dashboard: "/panel/perfil",
   turnos: "/turnos",
+  fletes: "/fletes",
+  auxilios: "/auxilios",
 };
 const pathPages = {
   ...Object.fromEntries(Object.entries(pagePaths).map(([p, path]) => [path, p])),
@@ -264,7 +286,16 @@ const pageTitles = {
   "change-password": "Cambiar contraseña — KPCars",
   dashboard: "Mi Panel — KPCars",
   turnos: "Solicitar turno — KPCars",
+  fletes: "KPCars Fletes — Próximamente",
+  auxilios: "KPCars Auxilios — Próximamente",
 };
+
+/* Áreas de KPCars. Rentals es la principal (es el inicio); las demás están en preparación. */
+const areas = [
+  { key: "rentals", name: "KPCars Rentals", icon: <CarIcon size={22} opacity={1} />, desc: "Alquiler de vehículos Toyota para trabajar en aplicaciones o de forma particular.", page: "catalog", cta: "Ver flota →" },
+  { key: "fletes", name: "KPCars Fletes", icon: <TruckIcon size={22} />, page: "fletes", soon: true },
+  { key: "auxilios", name: "KPCars Auxilios", icon: <LifebuoyIcon size={22} />, page: "auxilios", soon: true },
+];
 
 export default function KPCarsApp() {
   const location = useLocation();
@@ -558,6 +589,9 @@ export default function KPCarsApp() {
           <Route key={tab} path={`/panel/${tab}`} element={<Private user={user}><DashboardPage tab={tab} user={user} navigate={navigate} apiFetch={apiFetch} onUserUpdate={(updated) => { setUser(updated); localStorage.setItem("kpcars_user", JSON.stringify(updated)); }} /></Private>} />
         ))}
         <Route path="/turnos" element={<Private user={user}><TurnosPage user={user} apiFetch={apiFetch} navigate={navigate} /></Private>} />
+        {areas.filter((a) => a.soon).map((a) => (
+          <Route key={a.key} path={pagePaths[a.page]} element={<ComingSoonPage area={a} navigate={navigate} />} />
+        ))}
         {/* Dirección desconocida: al inicio (la página 404 llega en la Etapa 3) */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
@@ -687,6 +721,8 @@ function HomePage({ navigate, user }) {
       <style>{`
         .home-card { background: ${theme.gray900}; border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; padding: 28px; }
         .home-section { max-width: 1200px; margin: 0 auto; padding: 56px 20px; }
+        .area-card { transition: border-color 0.15s, transform 0.15s; }
+        .area-card:hover { border-color: rgba(235,136,0,0.35); transform: translateY(-2px); }
         @media (max-width: 900px) {
           .features-grid { grid-template-columns: repeat(2, 1fr) !important; }
           .steps-grid { grid-template-columns: 1fr !important; }
@@ -709,7 +745,7 @@ function HomePage({ navigate, user }) {
         <div style={{ maxWidth: 1200, margin: "0 auto", padding: "60px 20px", width: "100%" }}>
           {/* Badge */}
           <div className="anim-in" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 14px", background: "rgba(235,136,0,0.1)", border: "1px solid rgba(235,136,0,0.25)", borderRadius: 100, marginBottom: 28 }}>
-            <span style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: 2, color: theme.orange, textTransform: "uppercase" }}>Alquiler de vehículos · Buenos Aires</span>
+            <span style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: 2, color: theme.orange, textTransform: "uppercase" }}>KPCars Rentals · Alquiler de vehículos</span>
           </div>
 
           {/* Titular */}
@@ -720,7 +756,7 @@ function HomePage({ navigate, user }) {
           </h1>
 
           <p className="anim-in d2" style={{ fontSize: "1.05rem", color: theme.gray300, lineHeight: 1.65, marginBottom: 36, maxWidth: 480 }}>
-            Alquilá uno de nuestros vehículos y trabajá en Uber, Didi, Cabify o donde quieras. Vos ponés las ganas, nosotros ponemos el auto.
+            Alquila uno de nuestros vehículos y trabaja en Uber, Didi, Cabify o donde quieras. Tú pones las ganas, nosotros ponemos el auto.
           </p>
 
           <div className="anim-in d3" style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 72 }}>
@@ -785,7 +821,7 @@ function HomePage({ navigate, user }) {
             { name: "Uber", desc: "La plataforma más usada en Argentina" },
             { name: "Didi", desc: "Con alta demanda en el AMBA" },
             { name: "Cabify", desc: "Servicio premium con pasajeros frecuentes" },
-            { name: "Particular y más", desc: "Trabajá sin plataforma o con la que elijas" },
+            { name: "Particular y más", desc: "Trabaja sin plataforma o con la que elijas" },
           ].map((p) => (
             <div key={p.name} className="home-card">
               <h3 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.1rem", color: theme.white, letterSpacing: -0.5, marginBottom: 8 }}>{p.name}</h3>
@@ -795,8 +831,58 @@ function HomePage({ navigate, user }) {
         </div>
       </div>
 
+      {/* ── Áreas de KPCars ── */}
+      <div className="home-section">
+        <SectionHeader label="KPCars" title="Nuestros servicios">
+          KPCars Rentals es nuestra área principal. Muy pronto sumamos fletes y auxilios.
+        </SectionHeader>
+        <div className="features-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+          {areas.map((a) => (
+            <div key={a.key} className="home-card area-card" onClick={() => navigate(a.page)} style={{ cursor: "pointer", display: "flex", flexDirection: "column" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
+                <div style={{ width: 42, height: 42, background: "rgba(235,136,0,0.1)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", color: theme.orange }}>{a.icon}</div>
+                {a.soon && <SoonBadge />}
+              </div>
+              <h3 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.1rem", letterSpacing: -0.5, marginBottom: 8, color: theme.white }}>{a.name}</h3>
+              <p style={{ fontSize: "0.86rem", color: theme.gray400, lineHeight: 1.65, flex: 1 }}>{a.soon ? "Próximamente…" : a.desc}</p>
+              {a.cta && <div style={{ marginTop: 16, fontSize: "0.88rem", fontWeight: 700, color: theme.orange }}>{a.cta}</div>}
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* CTA */}
       {!user && <CTABanner navigate={navigate} />}
+    </div>
+  );
+}
+
+function SoonBadge() {
+  return <span style={{ fontSize: "0.68rem", fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", color: theme.orange, background: "rgba(235,136,0,0.1)", border: "1px solid rgba(235,136,0,0.25)", borderRadius: 100, padding: "4px 10px", whiteSpace: "nowrap" }}>Próximamente</span>;
+}
+
+/* ─────────────────────────────────────────────
+   ÁREA EN PREPARACIÓN (Fletes, Auxilios)
+   ───────────────────────────────────────────── */
+function ComingSoonPage({ area, navigate }) {
+  const waText = encodeURIComponent(`Hola, quiero consultar por ${area.name}.`);
+  return (
+    <div style={{ minHeight: "78vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "130px 20px 80px", position: "relative", overflow: "hidden" }}>
+      <div style={{ position: "absolute", top: "10%", left: "50%", transform: "translateX(-50%)", width: 600, height: 600, background: "radial-gradient(circle, rgba(235,136,0,0.08) 0%, transparent 65%)", pointerEvents: "none" }} />
+      <div className="anim-in" style={{ textAlign: "center", maxWidth: 560, position: "relative" }}>
+        <div style={{ width: 64, height: 64, margin: "0 auto 24px", background: "rgba(235,136,0,0.1)", border: "1px solid rgba(235,136,0,0.25)", borderRadius: 16, display: "flex", alignItems: "center", justifyContent: "center", color: theme.orange }}>{area.icon}</div>
+        <SectionLabel>{area.name}</SectionLabel>
+        <h1 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "clamp(2.2rem, 8vw, 4rem)", letterSpacing: -2, lineHeight: 1.05, marginBottom: 18 }}>
+          Próxima<span style={{ color: theme.orange }}>mente…</span>
+        </h1>
+        <p style={{ fontSize: "1rem", color: theme.gray300, lineHeight: 1.65, marginBottom: 32 }}>
+          Estamos preparando esta área. Mientras tanto, puedes consultarnos por WhatsApp.
+        </p>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
+          <a href={`https://wa.me/541123850982?text=${waText}`} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "13px 24px", borderRadius: 12, fontSize: "0.92rem", fontWeight: 700, textDecoration: "none", background: theme.orange, color: theme.black }}>Consultar por WhatsApp</a>
+          <Btn variant="secondary" onClick={() => navigate("home")}>Volver al inicio</Btn>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1091,7 +1177,7 @@ function ApplyPage() {
   return (
     <div>
       <div style={{ paddingTop: 110, maxWidth: 1200, margin: "0 auto", padding: "110px 20px 40px" }}>
-        <SectionLabel>Sumate al equipo</SectionLabel>
+        <SectionLabel>Súmate al equipo</SectionLabel>
         <SectionTitle>Quiero manejar con KPCars</SectionTitle>
         <p style={{ fontSize: "1rem", color: theme.gray400, maxWidth: 520, lineHeight: 1.6, marginBottom: 10 }}>
           Completa el formulario y nos ponemos en contacto contigo para coordinar los próximos pasos.
@@ -1099,7 +1185,19 @@ function ApplyPage() {
       </div>
 
       <div style={{ maxWidth: 600, margin: "0 auto", padding: "0 20px 100px" }}>
-        <div style={{ background: theme.gray900, border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: "clamp(20px, 5vw, 40px)" }}>
+        {/* Solo estilos: las preguntas, el orden y los valores no se tocan (los usa el script de Google Sheets) */}
+        <style>{`
+          .apply-form select:has(option[value=""]:checked) { color: ${theme.gray400} !important; }
+          .apply-form input::placeholder, .apply-form textarea::placeholder { color: ${theme.gray400}; opacity: 1; }
+          .app-chip { transition: border-color 0.15s, background 0.15s, color 0.15s; user-select: none; }
+          .app-chip:hover { border-color: rgba(255,255,255,0.18) !important; }
+          .app-chip:has(.app-check:checked) { border-color: ${theme.orange} !important; background: rgba(235,136,0,0.1) !important; color: ${theme.white} !important; }
+          .app-check { appearance: none; -webkit-appearance: none; width: 18px; height: 18px; margin: 0; flex-shrink: 0; border: 1.5px solid rgba(255,255,255,0.28); border-radius: 5px; background: transparent; cursor: pointer; position: relative; }
+          .app-check:checked { background: ${theme.orange}; border-color: ${theme.orange}; }
+          .app-check:checked::after { content: ""; position: absolute; left: 5px; top: 1px; width: 5px; height: 10px; border: solid ${theme.black}; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+          .app-check:focus { box-shadow: 0 0 0 3px rgba(235,136,0,0.15); }
+        `}</style>
+        <div className="apply-form" style={{ background: theme.gray900, border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, padding: "clamp(20px, 5vw, 40px)" }}>
           <p style={{ fontSize: "0.82rem", color: theme.gray400, marginBottom: 24 }}>
             Los campos marcados con <span style={{ color: theme.orange }}>*</span> son obligatorios.
           </p>
@@ -1208,8 +1306,8 @@ function ApplyPage() {
           <FormGroup label="¿Tienes experiencia con alguna de estas plataformas?">
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {["Uber", "Didi", "Cabify", "Particular", "Otra", "Ninguna"].map((app) => (
-                <label key={app} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: "0.88rem", color: theme.gray300, cursor: "pointer", padding: "9px 14px", background: theme.gray800, border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8 }}>
-                  <input type="checkbox" className="app-check" value={app} style={{ accentColor: theme.orange }} /> {app}
+                <label key={app} className="app-chip" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.88rem", color: theme.gray300, cursor: "pointer", padding: "9px 14px", background: theme.gray800, border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8 }}>
+                  <input type="checkbox" className="app-check" value={app} /> {app}
                 </label>
               ))}
             </div>
@@ -1322,7 +1420,7 @@ function LoginPage({ onLogin }) {
             <UserIcon size={28} />
           </div>
           <h2 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.6rem", letterSpacing: -0.5, marginBottom: 6 }}>Zona Conductores</h2>
-          <p style={{ color: theme.gray400, fontSize: "0.9rem" }}>Ingresá con tu DNI y contraseña</p>
+          <p style={{ color: theme.gray400, fontSize: "0.9rem" }}>Ingresa con tu DNI y contraseña</p>
         </div>
 
         <div style={{ background: theme.gray900, border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: "clamp(24px, 5vw, 36px)" }}>
@@ -1370,7 +1468,7 @@ function LoginPage({ onLogin }) {
           {showForgot && (
             <div style={{ background: "rgba(235,136,0,0.08)", border: "1px solid rgba(235,136,0,0.2)", borderRadius: 10, padding: 16, marginBottom: 20 }}>
               <p style={{ fontSize: "0.85rem", color: theme.gray200, lineHeight: 1.6, marginBottom: 12 }}>
-                Para recuperar tu contraseña, comunicate con la central de KPCars:
+                Para recuperar tu contraseña, comunícate con la central de KPCars:
               </p>
               <a
                 href="https://wa.me/541123850982?text=Hola%2C%20necesito%20recuperar%20mi%20contrase%C3%B1a"
@@ -2321,7 +2419,7 @@ function ChangePasswordPage({ user, token, onComplete }) {
               <path d="M7 11V7a5 5 0 0 1 10 0v4" />
             </svg>
           </div>
-          <h2 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.5rem", letterSpacing: -0.5, marginBottom: 6 }}>Cambiá tu contraseña</h2>
+          <h2 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.5rem", letterSpacing: -0.5, marginBottom: 6 }}>Cambia tu contraseña</h2>
           <p style={{ color: theme.gray400, fontSize: "0.9rem", lineHeight: 1.5 }}>
             Es tu primer inicio de sesión. Por seguridad,<br />elige una contraseña nueva.
           </p>
@@ -2377,7 +2475,7 @@ function ChangePasswordPage({ user, token, onComplete }) {
                 value={confirmPass}
                 onChange={(e) => setConfirmPass(e.target.value)}
                 style={{ ...inputStyle, paddingRight: 48 }}
-                placeholder="Repetí la contraseña"
+                placeholder="Repite la contraseña"
                 onKeyDown={(e) => e.key === "Enter" && handleChange()}
               />
               <button onClick={() => setShowConfirm(!showConfirm)} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: theme.gray400, cursor: "pointer", fontSize: "0.8rem", fontFamily: "'DM Sans', sans-serif" }}>
@@ -2482,11 +2580,11 @@ function TurnosPage({ user, apiFetch, navigate }) {
       return;
     }
     if (!urgencia) {
-      setError("Seleccioná el nivel de urgencia.");
+      setError("Selecciona el nivel de urgencia.");
       return;
     }
     if (!isUrgente && !selectedDate) {
-      setError("Seleccioná un día para el turno.");
+      setError("Selecciona un día para el turno.");
       return;
     }
     setError("");
@@ -2660,7 +2758,7 @@ function TurnosPage({ user, apiFetch, navigate }) {
         {!isUrgente && urgencia && (
           <div className="anim-in">
             <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, marginBottom: 12, color: theme.gray200 }}>
-              Elegí un día disponible <span style={{ color: theme.orange }}>*</span>
+              Elige un día disponible <span style={{ color: theme.orange }}>*</span>
             </label>
 
             {/* Navegación del mes */}
@@ -2860,7 +2958,8 @@ function Footer({ navigate, user }) {
   return (
     <footer style={{ borderTop: "1px solid rgba(255,255,255,0.06)", maxWidth: 1200, margin: "0 auto", padding: "0 20px" }}>
       <style>{`
-        .footer-grid { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 36px; padding: 52px 0 36px; }
+        .footer-grid { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr; gap: 36px; padding: 52px 0 36px; }
+        @media (max-width: 1000px) { .footer-grid { grid-template-columns: 1fr 1fr 1fr; } }
         @media (max-width: 768px) { .footer-grid { grid-template-columns: 1fr 1fr; } }
         @media (max-width: 480px) { .footer-grid { grid-template-columns: 1fr; } }
       `}</style>
@@ -2878,6 +2977,11 @@ function Footer({ navigate, user }) {
           {user
             ? <FooterLink onClick={() => navigate("dashboard")}>Mi Panel</FooterLink>
             : <FooterLink onClick={() => navigate("login")}>Zona Conductores</FooterLink>}
+        </FooterCol>
+        <FooterCol title="Servicios">
+          {areas.map((a) => (
+            <FooterLink key={a.key} onClick={() => navigate(a.page)}>{a.name}</FooterLink>
+          ))}
         </FooterCol>
         <FooterCol title="Contacto">
           <FooterLink href="tel:+541123850982">+54 11 2385-0982</FooterLink>
@@ -2938,7 +3042,7 @@ function WhatsAppButton() {
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        aria-label="Escribinos por WhatsApp"
+        aria-label="Escríbenos por WhatsApp"
         className="wa-float"
         style={{
           position: "fixed",     // fijo respecto a la ventana, no a la página
