@@ -3110,7 +3110,7 @@ function Footer({ navigate, user }) {
           ))}
         </FooterCol>
         <FooterCol title="Contacto">
-          <FooterLink href="tel:+541123850982">+54 11 2385-0982</FooterLink>
+          <FooterLink href={`tel:+${WHATSAPP_PUBLIC}`}>+54 9 11 6442-3273</FooterLink>
           <FooterLink href="mailto:info@kpcars.com.ar">info@kpcars.com.ar</FooterLink>
           <FooterLink href={`https://wa.me/${WHATSAPP_PUBLIC}`} external>WhatsApp</FooterLink>
         </FooterCol>
