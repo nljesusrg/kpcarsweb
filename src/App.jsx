@@ -1061,7 +1061,7 @@ function CatalogPage({ navigate, user }) {
         </div>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
           <p style={{ fontSize: "1rem", color: theme.gray400, maxWidth: 540, lineHeight: 1.6, marginBottom: 28 }}>
-            Más de 90 unidades Toyota Corolla, habilitadas para trabajar en aplicaciones de transporte y particular en Buenos Aires. Todos con GNC, aire acondicionado y baúl amplio.
+            Algunos de los Toyota Corolla de nuestra flota, habilitados para trabajar en aplicaciones de transporte y particular en Buenos Aires. Todos con GNC, aire acondicionado y baúl amplio.
           </p>
           {isAdmin && (
             <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>

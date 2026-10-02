@@ -166,8 +166,6 @@ function Nav({ page, navigate, menuOpen, setMenuOpen }) {
    ───────────────────────────────────────────── */
 function HomePage({ navigate }) {
   const stats = [
-    { number: "70+", label: "Choferes activos" },
-    { number: "90+", label: "Vehículos en flota" },
     { number: "100%", label: "Flota Toyota" },
     { number: "BA", label: "Buenos Aires" },
   ];
@@ -260,7 +258,7 @@ function CatalogPage({ navigate }) {
         <SectionLabel>Nuestra Flota</SectionLabel>
         <SectionTitle>Flota Toyota</SectionTitle>
         <p style={{ fontSize: "1rem", color: theme.gray400, maxWidth: 540, lineHeight: 1.6, marginBottom: 48 }}>
-          Más de 90 unidades Toyota — Corolla y Etios — modelos 2016 a 2019, habilitadas para trabajar en aplicaciones de transporte y particular en Buenos Aires.
+          Unidades Toyota — Corolla y Etios — modelos 2016 a 2019, habilitadas para trabajar en aplicaciones de transporte y particular en Buenos Aires.
         </p>
       </div>
 
