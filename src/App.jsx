@@ -33,66 +33,30 @@ const toAbsoluteUrl = (url) => {
 };
 
 /* ─────────────────────────────────────────────
-   CATALOG DATA — edita aquí para actualizar autos
+   FLOTA — tipos de vehículo, no autos puntuales.
+   La página muestra cómo son los autos, sin ofrecer una unidad
+   en particular: por eso no hay año, versión, patente ni "alquilado".
    ───────────────────────────────────────────── */
-const cars = [
+const PRICE_WEEKLY = "400.000"; // alquiler semanal en ARS, igual para todos los tipos
+
+const fleetTypes = [
   {
+    key: "automatico",
     model: "Toyota Corolla",
-    variant: "XEI Pack 1.8 CVT",
     transmission: "Automático",
-    year: "2016",
-    priceWeekly: "400.000",
-    features: ["Automático", "GNC", "Aire acondicionado", "Baúl amplio"],
-    image: imgPle625,
+    features: ["Caja automática", "GNC", "Aire acondicionado", "Baúl amplio"],
+    photos: [imgPle625, imgOmb591, imgAb956ys],
   },
   {
+    key: "manual",
     model: "Toyota Corolla",
-    variant: "XEI 1.8 CVT",
-    transmission: "Automático",
-    year: "2017",
-    priceWeekly: "400.000",
-    features: ["Automático", "GNC", "Aire acondicionado", "Baúl amplio"],
-    image: imgAb956ys,
-    rented: true,
-  },
-  {
-    model: "Toyota Corolla",
-    variant: "XEI 1.8 6M/T",
     transmission: "Manual",
-    year: "2017",
-    priceWeekly: "400.000",
-    features: ["Manual", "GNC", "Aire acondicionado", "Baúl amplio"],
-    image: imgAb773ym,
-  },
-  {
-    model: "Toyota Corolla",
-    variant: "XEI Pack 1.8 6M/T",
-    transmission: "Manual",
-    year: "2015",
-    priceWeekly: "400.000",
-    features: ["Manual", "GNC", "Aire acondicionado", "Baúl amplio"],
-    image: imgNyo037,
-    rented: true,
-  },
-  {
-    model: "Toyota Corolla",
-    variant: "XLI 1.8 CVT",
-    transmission: "Automático",
-    year: "2015",
-    priceWeekly: "400.000",
-    features: ["Automático", "GNC", "Aire acondicionado", "Baúl amplio"],
-    image: imgOmb591,
-  },
-  {
-    model: "Toyota Corolla",
-    variant: "XLI 1.8 6M/T",
-    transmission: "Manual",
-    year: "2017",
-    priceWeekly: "400.000",
-    features: ["Manual", "GNC", "Aire acondicionado", "Baúl amplio"],
-    image: imgAa865tl,
+    features: ["Caja manual", "GNC", "Aire acondicionado", "Baúl amplio"],
+    photos: [imgAb773ym, imgAa865tl, imgNyo037],
   },
 ];
+
+const FLEET_NOTE = "Las fotos son de referencia. La unidad se asigna según disponibilidad al momento de la entrega.";
 
 /* ─────────────────────────────────────────────
    STYLES
@@ -242,21 +206,6 @@ const PencilIcon = ({ size = 24 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-  </svg>
-);
-
-const TrashIcon = ({ size = 24 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="3 6 5 6 21 6" />
-    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-    <path d="M10 11v6M14 11v6" />
-    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-  </svg>
-);
-
-const PlusIcon = ({ size = 24 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
   </svg>
 );
 
@@ -910,12 +859,14 @@ function HomePage({ navigate, user }) {
   );
 }
 
-/* Carrusel con los autos disponibles de la flota. Lo mueve la persona: flechas en PC, dedo en celular. */
+/* Galería del inicio: muestra cómo son los autos, sin ofrecer una unidad puntual.
+   La mueve la persona: flechas en PC, dedo en celular. */
 function FleetCarousel({ navigate }) {
   const trackRef = useRef(null);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(true);
-  const available = cars.filter((c) => !c.rented);
+  // Intercala automáticos y manuales
+  const photos = fleetTypes[0].photos.flatMap((ph, i) => [ph, fleetTypes[1].photos[i]]).filter(Boolean);
 
   const updateArrows = () => {
     const t = trackRef.current;
@@ -937,9 +888,9 @@ function FleetCarousel({ navigate }) {
       <style>{`
         .fleet-track { display: flex; gap: 16px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
         .fleet-track::-webkit-scrollbar { display: none; }
-        .fleet-slide { flex: 0 0 calc((100% - 32px) / 3); scroll-snap-align: start; background: ${theme.gray900}; border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; overflow: hidden; cursor: pointer; transition: border-color 0.15s; }
+        .fleet-slide { flex: 0 0 calc((100% - 32px) / 3); scroll-snap-align: start; aspect-ratio: 4 / 3; background: ${theme.gray900}; border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; overflow: hidden; cursor: pointer; transition: border-color 0.15s; }
         .fleet-slide:hover { border-color: rgba(235,136,0,0.35); }
-        .fleet-slide img { transition: transform 0.4s ease; }
+        .fleet-slide img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.4s ease; }
         .fleet-slide:hover img { transform: scale(1.04); }
         @media (max-width: 900px) { .fleet-slide { flex-basis: calc((100% - 16px) / 2); } }
         @media (max-width: 640px) { .fleet-slide { flex-basis: 84%; } .fleet-arrows { display: none !important; } }
@@ -948,39 +899,29 @@ function FleetCarousel({ navigate }) {
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: "12px 32px", marginBottom: 36 }}>
         <div>
           <SectionLabel>Nuestra flota</SectionLabel>
-          <h2 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "clamp(1.6rem, 5vw, 2.6rem)", letterSpacing: -1, lineHeight: 1.1 }}>Autos listos<br /><Accent>para trabajar</Accent></h2>
+          <h2 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "clamp(1.6rem, 5vw, 2.6rem)", letterSpacing: -1, lineHeight: 1.1 }}>Así son<br /><Accent>nuestros autos</Accent></h2>
         </div>
         <div className="fleet-arrows" style={{ display: "flex", gap: 8 }}>
-          <button aria-label="Autos anteriores" disabled={!canPrev} onClick={() => move(-1)} style={arrow(canPrev)}>
+          <button aria-label="Fotos anteriores" disabled={!canPrev} onClick={() => move(-1)} style={arrow(canPrev)}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
           </button>
-          <button aria-label="Autos siguientes" disabled={!canNext} onClick={() => move(1)} style={arrow(canNext)}>
+          <button aria-label="Fotos siguientes" disabled={!canNext} onClick={() => move(1)} style={arrow(canNext)}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
           </button>
         </div>
       </div>
 
       <div ref={trackRef} className="fleet-track" onScroll={updateArrows}>
-        {available.map((car, i) => (
+        {photos.map((photo, i) => (
           <div key={i} className="fleet-slide" onClick={() => navigate("catalog")}>
-            <div style={{ width: "100%", aspectRatio: "16/10", background: `linear-gradient(135deg, ${theme.gray800}, ${theme.gray700})`, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
-              {car.image ? <img src={car.image} alt={`${car.model} ${car.variant}`} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : <CarIcon size={56} />}
-              <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 50, background: `linear-gradient(to top, ${theme.gray900}, transparent)` }} />
-            </div>
-            <div style={{ padding: 22 }}>
-              <div style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.1rem", marginBottom: 4 }}>{car.model}</div>
-              <div style={{ fontSize: "0.82rem", color: theme.gray400, marginBottom: 14 }}>{car.variant} · {car.year}</div>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 4, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-                <span style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.25rem", color: theme.orange }}>${car.priceWeekly}</span>
-                <span style={{ fontSize: "0.78rem", color: theme.gray400 }}>ARS / semana</span>
-              </div>
-            </div>
+            <img src={photo} alt="Toyota Corolla de la flota de KPCars" loading="lazy" />
           </div>
         ))}
       </div>
 
-      <div style={{ marginTop: 28 }}>
-        <Btn variant="secondary" onClick={() => navigate("catalog")}>Ver toda la flota →</Btn>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "14px 24px", marginTop: 28 }}>
+        <Btn variant="secondary" onClick={() => navigate("catalog")}>Conoce la flota →</Btn>
+        <p style={{ fontSize: "0.82rem", color: theme.gray400, maxWidth: 460, lineHeight: 1.55 }}>{FLEET_NOTE}</p>
       </div>
     </div>
   );
@@ -1017,118 +958,59 @@ function ComingSoonPage({ area, navigate }) {
 }
 
 /* ─────────────────────────────────────────────
-   CATALOG PAGE
+   FLOTA — cómo son los autos (por tipo, no por unidad)
    ───────────────────────────────────────────── */
 function CatalogPage({ navigate, user }) {
-  const isAdmin = user?.role === "administrador";
-  const [carList, setCarList] = useState(cars);
   const [lightbox, setLightbox] = useState(null);
-  const [editMode, setEditMode] = useState(false);
-  const [editTarget, setEditTarget] = useState(null);
-  const [deleteTarget, setDeleteTarget] = useState(null);
-  const [form, setForm] = useState({});
-
-  const fld = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value }));
-
-  const openEdit = (car, idx) => {
-    setForm({ model: car.model, variant: car.variant, transmission: car.transmission || "Automático", year: car.year, priceWeekly: car.priceWeekly, features: car.features.join("\n"), rented: car.rented || false });
-    setEditTarget({ _idx: idx, _image: car.image ?? null });
-  };
-
-  const openNew = () => {
-    setForm({ model: "Toyota Corolla", variant: "", transmission: "Automático", year: "", priceWeekly: "", features: "GNC\nAire acondicionado\nBaúl amplio", rented: false });
-    setEditTarget({ _idx: -1, _image: null });
-  };
-
-  const saveEdit = () => {
-    const updated = {
-      model: form.model, variant: form.variant, transmission: form.transmission,
-      year: form.year, priceWeekly: form.priceWeekly,
-      features: form.features.split("\n").map((f) => f.trim()).filter(Boolean),
-      rented: form.rented,
-      image: form.imagePreview || editTarget._image,
-    };
-    if (editTarget._idx === -1) {
-      setCarList((p) => [...p, updated]);
-    } else {
-      setCarList((p) => p.map((c, i) => i === editTarget._idx ? updated : c));
-    }
-    setEditTarget(null);
-  };
-
-  const inputS = { width: "100%", padding: "10px 12px", background: theme.gray800, border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: theme.white, fontFamily: "'DM Sans', sans-serif", fontSize: "0.9rem" };
-  const labelS = { display: "block", fontSize: "0.78rem", fontWeight: 700, color: theme.gray300, marginBottom: 5 };
 
   return (
     <div>
-      <div style={{ paddingTop: 110, maxWidth: 1200, margin: "0 auto", padding: "110px 20px 40px" }}>
-        <SectionLabel>Nuestra Flota</SectionLabel>
+      <style>{`
+        .fleet-types { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+        .fleet-info { display: grid; grid-template-columns: auto 1fr; gap: 0; }
+        .fleet-info > div + div { border-left: 1px solid rgba(255,255,255,0.07); }
+        .fleet-thumb { transition: border-color 0.15s, opacity 0.15s; }
+        .fleet-thumb:hover { opacity: 1 !important; }
+        @media (max-width: 820px) {
+          .fleet-types { grid-template-columns: 1fr; }
+          .fleet-info { grid-template-columns: 1fr; }
+          .fleet-info > div + div { border-left: none; border-top: 1px solid rgba(255,255,255,0.07); }
+        }
+      `}</style>
+
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "110px 20px 0" }}>
+        <SectionLabel>Nuestra flota</SectionLabel>
         <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", marginBottom: 14 }}>
           <SectionTitle>Flota Toyota</SectionTitle>
           <img src={toyotaLogo} alt="Toyota" style={{ height: 28, opacity: 0.7 }} />
         </div>
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-          <p style={{ fontSize: "1rem", color: theme.gray400, maxWidth: 540, lineHeight: 1.6, marginBottom: 28 }}>
-            Algunos de los Toyota Corolla de nuestra flota, habilitados para trabajar en aplicaciones de transporte y particular en Buenos Aires. Todos con GNC, aire acondicionado y baúl amplio.
-          </p>
-          {isAdmin && (
-            <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-              {editMode && (
-                <button onClick={openNew} style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", background: "rgba(235,136,0,0.12)", border: "1px solid rgba(235,136,0,0.3)", borderRadius: 10, color: theme.orange, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}>
-                  <PlusIcon size={16} /> Agregar vehículo
-                </button>
-              )}
-              <button onClick={() => setEditMode((v) => !v)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", background: editMode ? theme.orange : "rgba(255,255,255,0.06)", border: "none", borderRadius: 10, color: editMode ? theme.black : theme.white, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: "0.85rem", cursor: "pointer" }}>
-                <PencilIcon size={15} /> {editMode ? "Salir de edición" : "Editar catálogo"}
-              </button>
+        <p style={{ fontSize: "1rem", color: theme.gray400, maxWidth: 560, lineHeight: 1.6, marginBottom: 28 }}>
+          Así son los Toyota Corolla de nuestra flota: habilitados para trabajar en aplicaciones de transporte y particular en Buenos Aires. Todos con GNC, aire acondicionado y baúl amplio.
+        </p>
+
+        {/* Precio (una sola vez) + aviso de fotos de referencia */}
+        <div className="fleet-info" style={{ background: theme.gray900, border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, marginBottom: 20 }}>
+          <div style={{ padding: "20px 24px" }}>
+            <div style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: theme.gray400, marginBottom: 6 }}>Alquiler semanal</div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 6, whiteSpace: "nowrap" }}>
+              <span style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.6rem", color: theme.orange }}>${PRICE_WEEKLY}</span>
+              <span style={{ fontSize: "0.8rem", color: theme.gray400 }}>ARS</span>
             </div>
-          )}
+          </div>
+          <div style={{ padding: "20px 24px", display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ color: theme.orange, flexShrink: 0, display: "flex" }}><AlertIcon size={20} /></div>
+            <p style={{ fontSize: "0.9rem", color: theme.gray300, lineHeight: 1.55 }}>{FLEET_NOTE}</p>
+          </div>
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 20, maxWidth: 1200, margin: "0 auto", padding: "0 20px 60px" }}>
-        {carList.map((car, i) => (
-          <div key={i} style={{ background: theme.gray900, border: editMode ? "1px solid rgba(235,136,0,0.25)" : "1px solid rgba(255,255,255,0.05)", borderRadius: 12, overflow: "hidden", position: "relative", opacity: car.rented ? 0.72 : 1 }}>
-            <div
-              onClick={() => !editMode && !car.rented && car.image && setLightbox(car.image)}
-              style={{ width: "100%", aspectRatio: "16/10", background: `linear-gradient(135deg, ${theme.gray800}, ${theme.gray700})`, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden", cursor: !editMode && !car.rented && car.image ? "zoom-in" : "default" }}
-            >
-              {car.image ? (
-                <img src={car.image} alt={car.model} style={{ width: "100%", height: "100%", objectFit: "cover", filter: car.rented ? "grayscale(0.4)" : "none" }} />
-              ) : (
-                <CarIcon size={56} />
-              )}
-              <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 50, background: `linear-gradient(to top, ${theme.gray900}, transparent)` }} />
-              {car.rented && (
-                <div style={{ position: "absolute", top: 18, right: -42, transform: "rotate(45deg)", background: "linear-gradient(135deg, #d32f2f, #b71c1c)", color: theme.white, fontFamily: "'Archivo Black', sans-serif", fontSize: "0.78rem", letterSpacing: 1.5, textTransform: "uppercase", padding: "6px 50px", boxShadow: "0 2px 8px rgba(0,0,0,0.4)", pointerEvents: "none" }}>
-                  Alquilado
-                </div>
-              )}
-              {editMode && (
-                <div style={{ position: "absolute", top: 10, right: 10, display: "flex", gap: 6 }}>
-                  <button onClick={() => openEdit(car, i)} style={{ width: 34, height: 34, borderRadius: 8, background: "rgba(10,10,10,0.85)", border: "1px solid rgba(255,255,255,0.15)", color: theme.white, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><PencilIcon size={15} /></button>
-                  <button onClick={() => setDeleteTarget(i)} style={{ width: 34, height: 34, borderRadius: 8, background: "rgba(10,10,10,0.85)", border: "1px solid rgba(255,68,68,0.3)", color: "#ff6b6b", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><TrashIcon size={15} /></button>
-                </div>
-              )}
-            </div>
-            <div style={{ padding: 22 }}>
-              <div style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.15rem", marginBottom: 4 }}>{car.model}</div>
-              <div style={{ fontSize: "0.82rem", color: theme.gray400, marginBottom: 14 }}>{car.variant} · {car.year}</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 18 }}>
-                {car.features.map((f) => (
-                  <span key={f} style={{ fontSize: "0.72rem", color: theme.gray300, background: "rgba(255,255,255,0.05)", padding: "4px 11px", borderRadius: 100, fontWeight: 500 }}>{f}</span>
-                ))}
-              </div>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 4, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-                <span style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.3rem", color: car.rented ? theme.gray400 : theme.orange, textDecoration: car.rented ? "line-through" : "none" }}>${car.priceWeekly}</span>
-                <span style={{ fontSize: "0.78rem", color: theme.gray400 }}>ARS / semana</span>
-              </div>
-            </div>
-          </div>
+      <div className="fleet-types" style={{ maxWidth: 1200, margin: "0 auto", padding: "0 20px 60px" }}>
+        {fleetTypes.map((type) => (
+          <FleetTypeCard key={type.key} type={type} onZoom={setLightbox} onApply={user ? null : () => navigate("apply")} />
         ))}
       </div>
 
-      {/* Lightbox */}
+      {/* Foto ampliada */}
       {lightbox && (
         <div onClick={() => setLightbox(null)} style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.9)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-out", padding: 20 }}>
           <img src={lightbox} alt="Foto ampliada" style={{ maxWidth: "95%", maxHeight: "90vh", objectFit: "contain", borderRadius: 8 }} />
@@ -1136,95 +1018,43 @@ function CatalogPage({ navigate, user }) {
         </div>
       )}
 
-      {/* Modal edición / nuevo vehículo */}
-      {editTarget && (
-        <div onClick={() => setEditTarget(null)} style={{ position: "fixed", inset: 0, zIndex: 500, background: "rgba(0,0,0,0.75)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: theme.gray900, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "28px 24px", maxWidth: 480, width: "100%", maxHeight: "90vh", overflowY: "auto" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <h3 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.1rem" }}>{editTarget._idx === -1 ? "Agregar vehículo" : "Editar vehículo"}</h3>
-              <button onClick={() => setEditTarget(null)} style={{ background: "none", border: "none", color: theme.gray400, cursor: "pointer" }}><CloseIcon size={20} /></button>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
-              <div><label style={labelS}>Modelo</label><input style={inputS} value={form.model} onChange={fld("model")} /></div>
-              <div><label style={labelS}>Variante</label><input style={inputS} value={form.variant} onChange={fld("variant")} placeholder="XEI Pack 1.8 CVT" /></div>
-              <div>
-                <label style={labelS}>Transmisión</label>
-                <select style={inputS} value={form.transmission} onChange={fld("transmission")}>
-                  <option>Automático</option>
-                  <option>Manual</option>
-                </select>
-              </div>
-              <div><label style={labelS}>Año</label><input style={inputS} value={form.year} onChange={fld("year")} placeholder="2017" /></div>
-              <div style={{ gridColumn: "1 / -1" }}><label style={labelS}>Precio semanal (ARS, sin $)</label><input style={inputS} value={form.priceWeekly} onChange={fld("priceWeekly")} placeholder="400.000" /></div>
-            </div>
-
-            {/* Foto */}
-            <div style={{ marginBottom: 14 }}>
-              <label style={labelS}>Foto del vehículo</label>
-              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                <div style={{ width: 90, height: 60, borderRadius: 8, background: theme.gray800, border: "1px solid rgba(255,255,255,0.08)", overflow: "hidden", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  {form.imagePreview || editTarget._image
-                    ? <img src={form.imagePreview || editTarget._image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                    : <CarIcon size={28} opacity={0.3} />
-                  }
-                </div>
-                <label style={{ flex: 1, padding: "9px 14px", background: "rgba(255,255,255,0.04)", border: "1px dashed rgba(255,255,255,0.15)", borderRadius: 8, cursor: "pointer", fontSize: "0.82rem", color: theme.gray300, textAlign: "center" }}>
-                  {form.imagePreview ? "Cambiar imagen" : "Seleccionar imagen"}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    style={{ display: "none" }}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      const url = URL.createObjectURL(file);
-                      setForm((p) => ({ ...p, imagePreview: url }));
-                    }}
-                  />
-                </label>
-                {form.imagePreview && (
-                  <button onClick={() => setForm((p) => ({ ...p, imagePreview: null }))} style={{ background: "none", border: "none", color: theme.gray400, cursor: "pointer", padding: 4 }}><CloseIcon size={16} /></button>
-                )}
-              </div>
-              <p style={{ fontSize: "0.72rem", color: theme.gray400, marginTop: 6 }}>La imagen se guarda temporalmente. Cuando haya API se subirá al servidor.</p>
-            </div>
-
-            <div style={{ marginBottom: 14 }}>
-              <label style={labelS}>Características (una por línea)</label>
-              <textarea style={{ ...inputS, minHeight: 90, resize: "vertical" }} value={form.features} onChange={fld("features")} />
-            </div>
-
-            <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", marginBottom: 22 }}>
-              <input type="checkbox" checked={form.rented} onChange={fld("rented")} style={{ width: 16, height: 16, accentColor: theme.orange }} />
-              <span style={{ fontSize: "0.88rem", color: theme.gray300 }}>Marcar como alquilado</span>
-            </label>
-
-            <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => setEditTarget(null)} style={{ flex: 1, padding: "11px 0", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, color: theme.white, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: "0.88rem", cursor: "pointer" }}>Cancelar</button>
-              <button onClick={saveEdit} style={{ flex: 1, padding: "11px 0", background: theme.orange, border: "none", borderRadius: 10, color: theme.black, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer" }}>{editTarget._idx === -1 ? "Agregar" : "Guardar cambios"}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal confirmación eliminar */}
-      {deleteTarget !== null && (
-        <div onClick={() => setDeleteTarget(null)} style={{ position: "fixed", inset: 0, zIndex: 500, background: "rgba(0,0,0,0.75)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: theme.gray900, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "28px 24px", maxWidth: 380, width: "100%" }}>
-            <h3 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.05rem", marginBottom: 8 }}>¿Eliminar vehículo?</h3>
-            <p style={{ fontSize: "0.88rem", color: theme.gray400, lineHeight: 1.6, marginBottom: 20 }}>
-              Vas a eliminar <strong style={{ color: theme.white }}>{carList[deleteTarget]?.model} {carList[deleteTarget]?.variant}</strong> del catálogo.
-            </p>
-            <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => setDeleteTarget(null)} style={{ flex: 1, padding: "11px 0", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, color: theme.white, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: "0.88rem", cursor: "pointer" }}>Volver</button>
-              <button onClick={() => { setCarList((p) => p.filter((_, i) => i !== deleteTarget)); setDeleteTarget(null); }} style={{ flex: 1, padding: "11px 0", background: "#c62828", border: "none", borderRadius: 10, color: theme.white, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer" }}>Eliminar</button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {!user && <CTABanner navigate={navigate} />}
+    </div>
+  );
+}
+
+/* Tarjeta de un tipo de vehículo, con sus fotos de ejemplo */
+function FleetTypeCard({ type, onZoom, onApply }) {
+  const [current, setCurrent] = useState(0);
+  const name = `${type.model} ${type.transmission}`;
+
+  return (
+    <div style={{ background: theme.gray900, border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+      <div onClick={() => onZoom(type.photos[current])} style={{ width: "100%", aspectRatio: "16/10", background: `linear-gradient(135deg, ${theme.gray800}, ${theme.gray700})`, position: "relative", overflow: "hidden", cursor: "zoom-in" }}>
+        <img src={type.photos[current]} alt={`${name}, foto de referencia`} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 60, background: `linear-gradient(to top, ${theme.gray900}, transparent)`, pointerEvents: "none" }} />
+        <span style={{ position: "absolute", top: 12, left: 12, fontSize: "0.66rem", fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", color: theme.gray200, background: "rgba(10,10,10,0.72)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 100, padding: "4px 10px" }}>Foto de referencia</span>
+      </div>
+
+      <div style={{ padding: 22, display: "flex", flexDirection: "column", flex: 1 }}>
+        {/* Miniaturas */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+          {type.photos.map((photo, i) => (
+            <button key={i} className="fleet-thumb" aria-label={`Ver foto ${i + 1} de ${name}`} onClick={() => setCurrent(i)} style={{ width: 64, height: 46, padding: 0, borderRadius: 8, overflow: "hidden", cursor: "pointer", background: theme.gray800, border: i === current ? `2px solid ${theme.orange}` : "2px solid transparent", opacity: i === current ? 1 : 0.6 }}>
+              <img src={photo} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+            </button>
+          ))}
+        </div>
+
+        <div style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: theme.orange, marginBottom: 4 }}>{type.transmission}</div>
+        <h3 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.3rem", letterSpacing: -0.5, marginBottom: 14 }}>{type.model}</h3>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: onApply ? 22 : 0, flex: 1, alignContent: "flex-start" }}>
+          {type.features.map((f) => (
+            <span key={f} style={{ fontSize: "0.74rem", color: theme.gray300, background: "rgba(255,255,255,0.05)", padding: "5px 12px", borderRadius: 100, fontWeight: 500 }}>{f}</span>
+          ))}
+        </div>
+        {onApply && <div><Btn onClick={onApply}>Quiero manejar →</Btn></div>}
+      </div>
     </div>
   );
 }
