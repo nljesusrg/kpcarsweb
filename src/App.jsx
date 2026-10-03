@@ -1069,12 +1069,19 @@ function ApplyPage() {
   const [loading, setLoading] = useState(false);
   const [showEmpresa, setShowEmpresa] = useState(false);
 
-  const refs = {
-    nombre: useRef(), nacimiento: useRef(), direccion: useRef(), localidad: useRef(),
-    telefono: useRef(), email: useRef(), licencia: useRef(), vigencia: useRef(),
-    urgencia: useRef(), alquilerPrevio: useRef(), empresaAnterior: useRef(),
-    referencia: useRef(), comentario: useRef(),
-  };
+  const nombreRef = useRef();
+  const nacimientoRef = useRef();
+  const direccionRef = useRef();
+  const localidadRef = useRef();
+  const telefonoRef = useRef();
+  const emailRef = useRef();
+  const licenciaRef = useRef();
+  const vigenciaRef = useRef();
+  const urgenciaRef = useRef();
+  const alquilerPrevioRef = useRef();
+  const empresaAnteriorRef = useRef();
+  const referenciaRef = useRef();
+  const comentarioRef = useRef();
 
   const handleAlquilerChange = (e) => {
     const v = e.target.value;
@@ -1082,6 +1089,13 @@ function ApplyPage() {
   };
 
   const handleSubmit = async () => {
+    // Mismos nombres y mismo orden que antes: los usa el script de Google Sheets
+    const refs = {
+      nombre: nombreRef, nacimiento: nacimientoRef, direccion: direccionRef, localidad: localidadRef,
+      telefono: telefonoRef, email: emailRef, licencia: licenciaRef, vigencia: vigenciaRef,
+      urgencia: urgenciaRef, alquilerPrevio: alquilerPrevioRef, empresaAnterior: empresaAnteriorRef,
+      referencia: referenciaRef, comentario: comentarioRef,
+    };
     const v = {};
     Object.keys(refs).forEach((k) => { v[k] = refs[k].current?.value?.trim?.() ?? refs[k].current?.value ?? ""; });
 
@@ -1166,17 +1180,17 @@ function ApplyPage() {
           <FormSection label="Datos personales" />
           <FormRow>
             <FormGroup label="Nombre completo" required>
-              <input ref={refs.nombre} style={inputStyle} placeholder="Tu nombre y apellido" />
+              <input ref={nombreRef} style={inputStyle} placeholder="Tu nombre y apellido" />
             </FormGroup>
             <FormGroup label="Fecha de nacimiento" required>
-              <input ref={refs.nacimiento} type="date" style={{ ...inputStyle, colorScheme: "dark" }} />
+              <input ref={nacimientoRef} type="date" style={{ ...inputStyle, colorScheme: "dark" }} />
             </FormGroup>
           </FormRow>
           <FormGroup label="Dirección" required>
-            <input ref={refs.direccion} style={inputStyle} placeholder="Calle y número" />
+            <input ref={direccionRef} style={inputStyle} placeholder="Calle y número" />
           </FormGroup>
           <FormGroup label="Localidad" required>
-            <select ref={refs.localidad} style={inputStyle} defaultValue="">
+            <select ref={localidadRef} style={inputStyle} defaultValue="">
               <option value="" disabled>Selecciona tu localidad</option>
               <optgroup label="CABA">
                 <option value="CABA">Ciudad Autónoma de Buenos Aires</option>
@@ -1218,10 +1232,10 @@ function ApplyPage() {
           </FormGroup>
           <FormRow>
             <FormGroup label="Teléfono" required>
-              <input ref={refs.telefono} type="tel" style={inputStyle} placeholder="+54 11 1234-5678" />
+              <input ref={telefonoRef} type="tel" style={inputStyle} placeholder="+54 11 1234-5678" />
             </FormGroup>
             <FormGroup label="Email" required>
-              <input ref={refs.email} type="email" style={inputStyle} placeholder="tu@email.com" />
+              <input ref={emailRef} type="email" style={inputStyle} placeholder="tu@email.com" />
             </FormGroup>
           </FormRow>
 
@@ -1229,7 +1243,7 @@ function ApplyPage() {
           <FormSection label="Licencia de conducir" />
           <FormRow>
             <FormGroup label="¿Tienes licencia vigente?" required>
-              <select ref={refs.licencia} style={inputStyle} defaultValue="">
+              <select ref={licenciaRef} style={inputStyle} defaultValue="">
                 <option value="" disabled>Selecciona una opción</option>
                 <option value="Sí - Profesional">Sí — Profesional</option>
                 <option value="Sí - Particular">Sí — Particular</option>
@@ -1238,7 +1252,7 @@ function ApplyPage() {
               </select>
             </FormGroup>
             <FormGroup label="Vigencia de la licencia" required>
-              <select ref={refs.vigencia} style={inputStyle} defaultValue="">
+              <select ref={vigenciaRef} style={inputStyle} defaultValue="">
                 <option value="" disabled>Selecciona una opción</option>
                 <option value="Menos de 1 año">Menos de 1 año</option>
                 <option value="1 a 3 años">1 a 3 años</option>
@@ -1252,7 +1266,7 @@ function ApplyPage() {
           {/* ── Disponibilidad ── */}
           <FormSection label="Disponibilidad" />
           <FormGroup label="¿Con qué urgencia necesitas el vehículo?" required>
-            <select ref={refs.urgencia} style={inputStyle} defaultValue="">
+            <select ref={urgenciaRef} style={inputStyle} defaultValue="">
               <option value="" disabled>Selecciona una opción</option>
               <option value="Inmediata - Esta semana">Lo necesito ya (esta semana)</option>
               <option value="15 días">En los próximos 15 días</option>
@@ -1273,7 +1287,7 @@ function ApplyPage() {
             </div>
           </FormGroup>
           <FormGroup label="¿Alquilaste un auto antes para trabajar?" required>
-            <select ref={refs.alquilerPrevio} style={inputStyle} defaultValue="" onChange={handleAlquilerChange}>
+            <select ref={alquilerPrevioRef} style={inputStyle} defaultValue="" onChange={handleAlquilerChange}>
               <option value="" disabled>Selecciona una opción</option>
               <option value="No, primera vez">No, sería mi primera vez</option>
               <option value="Sí, a una empresa">Sí, a una empresa de alquiler</option>
@@ -1282,14 +1296,14 @@ function ApplyPage() {
           </FormGroup>
           {showEmpresa && (
             <FormGroup label="¿En qué empresa o con quién alquilaste?">
-              <input ref={refs.empresaAnterior} style={inputStyle} placeholder="Nombre de la empresa o persona" />
+              <input ref={empresaAnteriorRef} style={inputStyle} placeholder="Nombre de la empresa o persona" />
             </FormGroup>
           )}
 
           {/* ── Cierre ── */}
           <FormSection label="Para terminar" />
           <FormGroup label="¿Cómo conociste KPCars?" required>
-            <select ref={refs.referencia} style={inputStyle} defaultValue="">
+            <select ref={referenciaRef} style={inputStyle} defaultValue="">
               <option value="" disabled>Selecciona una opción</option>
               <option value="Redes sociales">Redes sociales</option>
               <option value="Recomendación">Recomendación de un conocido</option>
@@ -1299,7 +1313,7 @@ function ApplyPage() {
             </select>
           </FormGroup>
           <FormGroup label="¿Quieres agregar algo más?">
-            <textarea ref={refs.comentario} style={{ ...inputStyle, minHeight: 90, resize: "vertical" }} placeholder="Disponibilidad horaria, consultas, etc." />
+            <textarea ref={comentarioRef} style={{ ...inputStyle, minHeight: 90, resize: "vertical" }} placeholder="Disponibilidad horaria, consultas, etc." />
           </FormGroup>
 
           <button
