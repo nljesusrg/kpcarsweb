@@ -22,8 +22,8 @@
 - Por eso el trabajo a medio hacer va en otra rama, que no publica nada.
 - Pendiente menor: actualizar `actions/checkout@v4` y `actions/setup-node@v4` en `.github/workflows/deploy.yml` (GitHub avisa que quedan viejas).
 
-## Área del chofer: rediseño en curso (octubre 2026)
-**Dónde está:** en la rama `rediseno-area-chofer`. Todavía NO está en `main` ni publicado. Para seguir: `git fetch` y `git switch rediseno-area-chofer`. Cuando esté aprobado, se pasa a `main` y ahí se publica.
+## Área del chofer: rediseño (octubre 2026)
+**Dónde está:** en `main` y publicado en el sitio real desde el 3 de octubre de 2026, por pedido de Leonardo. La rama `rediseno-area-chofer` quedó igual que `main` y ya no hace falta.
 
 **Qué se decidió**
 - Los choferes entran 100% desde el celular y lo que más consultan son los turnos. El panel se piensa primero para celular, con letra grande.
@@ -42,7 +42,7 @@
 - Se muestran en LISTA (tabla en pantallas grandes, renglones apilados en el celular), no en tarjetas. Pendientes arriba, pagadas plegadas abajo.
 
 **Qué falta**
-- Probar con un chofer real: confirmar un turno (paso 3), cancelar un turno y abrir un PDF de multa. Son acciones reales, Claude no las ejecutó.
+- Se publicó sin haber probado esto, así que es lo primero a revisar. Probar con un chofer real: confirmar un turno (paso 3), cancelar un turno y abrir un PDF de multa. Son acciones reales, Claude no las ejecutó.
 - Revisar la pantalla "Mis datos": es la de perfil anterior, sin rediseñar.
 - Decidir si el botón flotante de WhatsApp se oculta dentro del panel en el celular (hoy puede tapar parte de la lista de multas).
 - Decidir qué etiqueta llevan los turnos de fechas pasadas que el sistema sigue marcando "Agendado".
