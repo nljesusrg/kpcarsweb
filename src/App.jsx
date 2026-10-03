@@ -140,9 +140,10 @@ const UserIcon = ({ size = 18 }) => (
 );
 
 const ProfileAvatar = ({ user, size = 160 }) => {
-  const [broken, setBroken] = useState(false);
+  // Guardamos qué foto falló: si llega otra distinta, se vuelve a intentar sola
+  const [brokenFoto, setBrokenFoto] = useState(null);
   const foto = user?.foto || null;
-  useEffect(() => { setBroken(false); }, [foto]);
+  const broken = brokenFoto === foto;
   const initials = ((user?.nombre?.[0] || "") + (user?.apellido?.[0] || "")).toUpperCase() || "?";
   const fontSize = Math.round(size * 0.3);
 
@@ -152,7 +153,7 @@ const ProfileAvatar = ({ user, size = 160 }) => {
         src={foto}
         alt="Foto de perfil"
         style={{ width: "100%", height: "100%", objectFit: "cover" }}
-        onError={() => setBroken(true)}
+        onError={() => setBrokenFoto(foto)}
       />
     );
   }
@@ -365,10 +366,10 @@ export default function KPCarsApp() {
         if (meRes.ok && (inner.id || inner.name || inner.dni)) {
           meProfile = { ...meProfile, ...inner };
         }
-      } catch {}
+      } catch { /* si la respuesta no es JSON, seguimos con lo que ya tenemos */ }
 
       let historialData = null;
-      try { historialData = historialRes && historialRes.ok ? await historialRes.json() : null; } catch {}
+      try { historialData = historialRes && historialRes.ok ? await historialRes.json() : null; } catch { /* sin historial: queda en null */ }
 
       const pick = (...keys) => { for (const k of keys) { if (meProfile[k]) return meProfile[k]; } return ""; };
 
@@ -414,7 +415,7 @@ export default function KPCarsApp() {
       } else {
         goAfterLogin();
       }
-    } catch (err) {
+    } catch {
       // Si falla todo, usamos los datos que ya vienen en la respuesta del login
       const fb = loginData.user || {};
       const fbName = fb.name || fb.nombre || "Conductor";
@@ -466,10 +467,10 @@ export default function KPCarsApp() {
         const meData = await meRes.json();
         const inner = meData.user || meData;
         if (meRes.ok && (inner.id || inner.name || inner.dni)) meProfile = { ...meProfile, ...inner };
-      } catch {}
+      } catch { /* si la respuesta no es JSON, seguimos con lo que ya tenemos */ }
 
       let historialData = null;
-      try { historialData = historialRes && historialRes.ok ? await historialRes.json() : null; } catch {}
+      try { historialData = historialRes && historialRes.ok ? await historialRes.json() : null; } catch { /* sin historial: queda en null */ }
 
       const pick = (...keys) => { for (const k of keys) { if (meProfile[k]) return meProfile[k]; } return ""; };
       const fullName = pick("name", "nombre", "nombres");
@@ -1365,7 +1366,7 @@ function LoginPage({ onLogin }) {
         user: data.user || {},
       });
 
-    } catch (err) {
+    } catch {
       setError("Error de conexión. Verifica tu internet e intenta de nuevo.");
       setLoading(false);
     }
@@ -1594,7 +1595,7 @@ function ProfileTab({ user, apiFetch, onUpdate }) {
         setEmail(updated.email || "");
         setTelefono(updated.telefono || "");
       }
-    } catch {} finally {
+    } catch { /* si falla la sincronización, se muestran los datos que ya había */ } finally {
       if (!firstSyncDone.current) {
         firstSyncDone.current = true;
         setLoadingProfile(false);
@@ -1904,7 +1905,7 @@ function VehicleCard({ auto }) {
 /* ── Patente ── */
 function PlateDisplay({ patente }) {
   if (!patente) return <span style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "2rem", color: theme.gray600 }}>—</span>;
-  const clean = patente.toUpperCase().replace(/[\s\-]/g, "");
+  const clean = patente.toUpperCase().replace(/[\s-]/g, "");
   let formatted = patente.toUpperCase();
   if (clean.length === 7) formatted = `${clean.slice(0,2)} ${clean.slice(2,5)} ${clean.slice(5)}`;
   else if (clean.length === 6) formatted = `${clean.slice(0,3)} ${clean.slice(3)}`;
@@ -1937,7 +1938,7 @@ const RefreshIcon = ({ size = 18, spinning = false }) => (
 );
 
 /* ── Turnos del conductor ── */
-function TurnosTab({ user, apiFetch, navigate }) {
+function TurnosTab({ apiFetch, navigate }) {
   const [turnos, setTurnos] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -2303,7 +2304,7 @@ function TurnosTab({ user, apiFetch, navigate }) {
 /* ─────────────────────────────────────────────
    CHANGE PASSWORD PAGE (primer login)
    ───────────────────────────────────────────── */
-function ChangePasswordPage({ user, token, onComplete }) {
+function ChangePasswordPage({ token, onComplete }) {
   const [currentPass, setCurrentPass] = useState("");
   const [newPass, setNewPass] = useState("");
   const [confirmPass, setConfirmPass] = useState("");
@@ -2362,7 +2363,7 @@ function ChangePasswordPage({ user, token, onComplete }) {
 
       onComplete(data.token || null);
 
-    } catch (err) {
+    } catch {
       setError("Error de conexión. Intenta de nuevo.");
       setLoading(false);
     }
