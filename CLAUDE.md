@@ -10,3 +10,40 @@
 - Antes de hacer cualquier cambio, explicame de forma simple qué vas a cambiar y por qué.
 - Pedime permiso antes de crear, modificar o borrar cualquier archivo. No toques nada hasta que te diga que sí.
 - Si hay varias formas de hacer algo, recomendame una y contame por qué, en pocas palabras.
+
+## Cómo levantar el proyecto en una compu
+- Hace falta Node 22 o más nuevo (lo pide `react-router`). En la Mac se instaló con Homebrew (`brew install node@22`).
+- Después de clonar o de bajar cambios: `npm install`, y para ver la página `npm run dev` (queda en http://localhost:5173/).
+- Antes de trabajar, bajar lo último de GitHub (`git pull`). Se trabaja desde dos compus y las conversaciones con Claude no pasan de una a otra: lo que haya que recordar va en este archivo.
+- `npm run lint` (el revisor de código) tiene que quedar en cero errores.
+
+## Cómo se publica
+- Cada `git push` a la rama `main` publica el sitio real: GitHub arma la página y la deja en la rama `deploy`, y Hostinger la copia al dominio.
+- Por eso el trabajo a medio hacer va en otra rama, que no publica nada.
+- Pendiente menor: actualizar `actions/checkout@v4` y `actions/setup-node@v4` en `.github/workflows/deploy.yml` (GitHub avisa que quedan viejas).
+
+## Área del chofer: rediseño en curso (octubre 2026)
+**Dónde está:** en la rama `rediseno-area-chofer`. Todavía NO está en `main` ni publicado. Para seguir: `git fetch` y `git switch rediseno-area-chofer`. Cuando esté aprobado, se pasa a `main` y ahí se publica.
+
+**Qué se decidió**
+- Los choferes entran 100% desde el celular y lo que más consultan son los turnos. El panel se piensa primero para celular, con letra grande.
+- Pero también tiene que verse bien en pantallas grandes: ahí las secciones van como pestañas arriba a la derecha del saludo (como era antes), con el botón "Pedir turno", y el contenido usa el ancho.
+- Secciones del panel: Inicio (`/panel/inicio`, es donde se entra), Turnos, Multas y Mis datos. En el celular van en una barra fija abajo.
+- Pedir turno (`/turnos`) es en 3 pasos: qué le pasa al auto, qué día, revisar y confirmar. El urgente salta el paso del día. Las reglas no cambiaron: sin turnos normales miércoles, sábados ni domingos; un día con 4 turnos normales queda "Sin lugar"; se ofrecen hasta 60 días para adelante.
+- Los textos de la página van de "tú" ("Tienes", "Debes"), como el resto del sitio.
+- Maqueta de referencia (privada, de la cuenta de Leonardo): https://claude.ai/artifact/UHbmVbMntYFq98wkpmN9C1
+
+**Multas** (la sección no existía en el código; se hizo de cero)
+- La API es `GET /mis-multas` (con sesión). Devuelve `multas` y `total_adeudado`. Cada multa trae: `id`, `fecha`, `fecha_vencimiento`, `descripcion`, `jurisdiccion`, `punto_rojo`, `sin_importe`, `patente`, `monto`, `monto_adeudado`, `cobrado`, `pdf_url`.
+- El chofer ve: motivo, fecha, vencimiento, patente, jurisdicción, monto y el PDF de la multa. Los montos SÍ se muestran, y también el total adeudado.
+- "Cobrada" (nombre interno) se muestra al chofer como "Pagada".
+- "Punto rojo" es una multa pendiente que igual se paga; lleva una etiqueta. Si viene sin monto, se muestra "A confirmar".
+- Si hay pago parcial, se muestra lo que falta y debajo "Pagaste $X de $Y".
+- Se muestran en LISTA (tabla en pantallas grandes, renglones apilados en el celular), no en tarjetas. Pendientes arriba, pagadas plegadas abajo.
+
+**Qué falta**
+- Probar con un chofer real: confirmar un turno (paso 3), cancelar un turno y abrir un PDF de multa. Son acciones reales, Claude no las ejecutó.
+- Revisar la pantalla "Mis datos": es la de perfil anterior, sin rediseñar.
+- Decidir si el botón flotante de WhatsApp se oculta dentro del panel en el celular (hoy puede tapar parte de la lista de multas).
+- Decidir qué etiqueta llevan los turnos de fechas pasadas que el sistema sigue marcando "Agendado".
+- Confirmar que los días "Sin lugar" que muestra el paso 2 coinciden con la realidad del taller.
