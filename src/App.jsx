@@ -228,7 +228,7 @@ const pagePaths = {
   apply: "/quiero-manejar",
   login: "/conductores",
   "change-password": "/cambiar-contrasena",
-  dashboard: "/panel/perfil",
+  dashboard: "/panel/inicio",
   turnos: "/turnos",
   fletes: "/fletes",
   auxilios: "/auxilios",
@@ -237,7 +237,9 @@ const pathPages = {
   ...Object.fromEntries(Object.entries(pagePaths).map(([p, path]) => [path, p])),
   // Las pestañas del panel son todas la sección "dashboard"
   "/panel": "dashboard",
+  "/panel/perfil": "dashboard",
   "/panel/turnos": "dashboard",
+  "/panel/multas": "dashboard",
 };
 
 const pageTitles = {
@@ -571,10 +573,10 @@ export default function KPCarsApp() {
         {/* Páginas privadas: sin sesión, van a Zona Conductores (ver <Private>) */}
         <Route path="/cambiar-contrasena" element={<Private user={user}><ChangePasswordPage user={user} token={token} onComplete={handlePasswordChanged} /></Private>} />
         <Route path="/panel" element={<Navigate to={pagePaths.dashboard} replace />} />
-        {["perfil", "turnos"].map((tab) => (
+        {["inicio", "turnos", "multas", "perfil"].map((tab) => (
           <Route key={tab} path={`/panel/${tab}`} element={<Private user={user}><DashboardPage tab={tab} user={user} navigate={navigate} apiFetch={apiFetch} onUserUpdate={(updated) => { setUser(updated); localStorage.setItem("kpcars_user", JSON.stringify(updated)); }} /></Private>} />
         ))}
-        <Route path="/turnos" element={<Private user={user}><TurnosPage user={user} apiFetch={apiFetch} navigate={navigate} /></Private>} />
+        <Route path="/turnos" element={<Private user={user}><TurnosPage user={user} apiFetch={apiFetch} /></Private>} />
         {areas.filter((a) => a.soon).map((a) => (
           <Route key={a.key} path={pagePaths[a.page]} element={<ComingSoonPage area={a} navigate={navigate} />} />
         ))}
@@ -1515,61 +1517,460 @@ function VencimientosBanner({ user }) {
 /* ─────────────────────────────────────────────
    DASHBOARD PAGE (PANEL DEL CONDUCTOR)
    ───────────────────────────────────────────── */
+/* ── Ayudas del panel: fechas, plata y textos ── */
+const pad2 = (n) => String(n).padStart(2, "0");
+// Fecha local como "AAAA-MM-DD" (por defecto, hoy)
+const localDateStr = (d = new Date()) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const capitalize = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
+// "2026-10-06" → "Martes 6 de octubre" (o "Hoy" / "Mañana")
+const dayLabel = (dateStr) => {
+  if (!dateStr) return "—";
+  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+  if (dateStr === localDateStr()) return "Hoy";
+  if (dateStr === localDateStr(tomorrow)) return "Mañana";
+  return capitalize(new Date(dateStr + "T12:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" }));
+};
+// "2026-10-06" → "06/10/2026"
+const shortDate = (dateStr) => dateStr ? new Date(dateStr.split("T")[0] + "T12:00:00").toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—";
+// Días que faltan para una fecha (negativo si ya pasó)
+const daysUntil = (dateStr) => Math.round((new Date(dateStr.split("T")[0] + "T12:00:00") - new Date(localDateStr() + "T12:00:00")) / 86400000);
+// 71249.25 → "$71.249,25"
+const fmtMoney = (n) => "$" + Number(n || 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// "EXC DE VELOCIDAD" → "Exc de velocidad"
+const sentenceCase = (s) => capitalize(String(s || "").trim().toLowerCase()) || "—";
+// "AB123CD" → "AB 123 CD"
+const fmtPatente = (patente) => {
+  if (!patente) return "—";
+  const clean = patente.toUpperCase().replace(/[\s-]/g, "");
+  if (clean.length === 7) return `${clean.slice(0, 2)} ${clean.slice(2, 5)} ${clean.slice(5)}`;
+  if (clean.length === 6) return `${clean.slice(0, 3)} ${clean.slice(3)}`;
+  return patente.toUpperCase();
+};
+
+const turnoDay = (t) => t.scheduled_date?.split("T")[0] ?? "";
+// Un turno "próximo" es de hoy en adelante y no está cancelado ni terminado
+const isTurnoProximo = (t) => turnoDay(t) >= localDateStr() && t.status !== "cancelado" && t.status !== "completado";
+
+// Trae todos los turnos del conductor (la API los entrega de a páginas)
+const fetchAllTurnos = async (apiFetch) => {
+  let page = 1;
+  let all = [];
+  while (true) {
+    const res = await apiFetch(`/mis-turnos?page=${page}`);
+    const data = await res.json();
+    const items = data.data || [];
+    all = [...all, ...items];
+    if (page >= (data.last_page || 1) || items.length === 0) break;
+    page++;
+  }
+  return all;
+};
+
+const driverWhatsAppHref = (message = "¡Hola! Soy conductor de KPCars y tengo una consulta.") =>
+  `https://wa.me/${WHATSAPP_DRIVERS}?text=${encodeURIComponent(message)}`;
+
+/* Estilos compartidos del panel: letra grande y botones cómodos para el celular */
+const panel = {
+  card: { background: theme.gray900, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 18 },
+  h1: { fontFamily: "'Archivo Black', sans-serif", fontSize: "clamp(1.9rem, 8vw, 2.4rem)", letterSpacing: -0.5, lineHeight: 1.1, margin: 0 },
+  h2: { fontSize: "0.9rem", fontWeight: 700, color: theme.gray300, margin: "12px 0 0" },
+  muted: { fontSize: "0.95rem", color: theme.gray300, lineHeight: 1.45, margin: 0 },
+  btn: { display: "flex", alignItems: "center", justifyContent: "center", gap: 10, width: "100%", minHeight: 56, padding: "0 18px", borderRadius: 16, fontFamily: "'DM Sans', sans-serif", fontSize: "1.1rem", fontWeight: 700, cursor: "pointer", textDecoration: "none", boxSizing: "border-box" },
+  chip: (color, bg) => ({ display: "inline-block", padding: "4px 10px", borderRadius: 999, background: bg, color, fontSize: "0.82rem", fontWeight: 700, whiteSpace: "nowrap" }),
+};
+panel.btnPrimary = { ...panel.btn, background: theme.orange, color: theme.black, border: "none" };
+panel.btnOutline = { ...panel.btn, background: "transparent", color: theme.white, border: `2px solid ${theme.orange}` };
+panel.btnQuiet = { ...panel.btn, minHeight: 48, fontSize: "1rem", borderRadius: 12, background: "transparent", color: theme.white, border: "1px solid rgba(255,255,255,0.28)" };
+panel.btnText = { ...panel.btn, minHeight: 48, fontSize: "1rem", background: "transparent", color: theme.orange, border: "none" };
+
+const turnoStatus = {
+  agendado:   { label: "Agendado",   color: "#ffb347",     bg: "rgba(235,136,0,0.16)" },
+  en_proceso: { label: "En proceso", color: "#7fd0ff",     bg: "rgba(41,182,246,0.14)" },
+  completado: { label: "Completado", color: "#8fd9a8",     bg: "rgba(76,175,80,0.14)" },
+  cancelado:  { label: "Cancelado",  color: theme.gray200, bg: "rgba(255,255,255,0.08)" },
+};
+
+const PlusIcon = ({ size = 22 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+);
+const ChatIcon = ({ size = 22 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#5fd38d" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+  </svg>
+);
+const ChevronIcon = ({ size = 20, dir = "right" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
+    <polyline points={{ right: "9 18 15 12 9 6", left: "15 18 9 12 15 6", down: "6 9 12 15 18 9", up: "6 15 12 9 18 15" }[dir]} />
+  </svg>
+);
+const panelNavIcons = {
+  inicio: <path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />,
+  turnos: <><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></>,
+  multas: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="8" y1="13" x2="16" y2="13" /><line x1="8" y1="17" x2="13" y2="17" /></>,
+  perfil: <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></>,
+};
+
+/* Las secciones del panel, en el orden de la barra de abajo */
+const panelTabs = [
+  { key: "inicio", label: "Inicio" },
+  { key: "turnos", label: "Turnos", title: "Mis turnos" },
+  { key: "multas", label: "Multas", title: "Mis multas" },
+  { key: "perfil", label: "Mis datos", title: "Mis datos" },
+];
+
 function DashboardPage({ tab, user, navigate, apiFetch, onUserUpdate }) {
-  // Cada pestaña tiene su dirección: /panel/perfil y /panel/turnos
+  // Cada sección tiene su dirección: /panel/inicio, /panel/turnos, /panel/multas y /panel/perfil
   const routerNavigate = useNavigate();
   const setTab = (t) => routerNavigate(`/panel/${t}`);
+  const current = panelTabs.find((t) => t.key === tab) || panelTabs[0];
 
   return (
-    <div style={{ paddingTop: 84, maxWidth: 900, margin: "0 auto", padding: "84px 20px 80px" }}>
+    // En el celular: barra fija abajo (el espacio de abajo es para que no tape el final de la página).
+    // En pantallas grandes: las mismas secciones van como pestañas arriba y el contenido usa dos columnas.
+    <div className="panel-wrap" style={{ maxWidth: 900, margin: "0 auto", padding: "96px 20px 120px" }}>
+      <style>{`
+        .panel-tabs-top { display: none; }
+        @media (min-width: 768px) {
+          .panel-wrap { padding-bottom: 80px !important; }
+          .panel-tabs-top { display: flex; }
+          .panel-nav-bottom, .panel-mobile-only { display: none !important; }
+          .panel-cols { display: grid !important; grid-template-columns: 1fr 1fr; align-items: start; gap: 16px !important; }
+        }
+      `}</style>
 
-      {/* Header: saludo + tabs en la misma fila */}
-      <div className="anim-in dash-header" style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 20, marginBottom: 36 }}>
+      {/* Encabezado: saludo o título a la izquierda, pestañas a la derecha */}
+      <div className="anim-in" style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 20, flexWrap: "wrap", marginBottom: 24 }}>
         <div>
-          <p style={{ fontSize: "0.68rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: 3, color: theme.orange, marginBottom: 6 }}>Panel del conductor</p>
-          <h1 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "clamp(1.8rem, 5vw, 2.8rem)", letterSpacing: -1, lineHeight: 1.05 }}>
-            Hola, <span style={{ color: theme.orange }}>{user.nombre || "Conductor"}</span>
-          </h1>
+          {tab === "inicio" ? (
+            <>
+              <p style={{ fontSize: "0.8rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: theme.orange, marginBottom: 6 }}>Panel del conductor</p>
+              <h1 style={panel.h1}>Hola, <span style={{ color: theme.orange }}>{user.nombre || "Conductor"}</span></h1>
+            </>
+          ) : (
+            <h1 style={panel.h1}>{current.title}</h1>
+          )}
         </div>
 
-        {/* Botones de tab */}
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", flexShrink: 0 }}>
-          <button
-            onClick={() => setTab("perfil")}
-            style={{ display: "flex", alignItems: "center", gap: 7, padding: "10px 18px", borderRadius: 10, fontSize: "0.88rem", fontWeight: 600, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", border: "none", background: tab === "perfil" ? theme.orange : "rgba(255,255,255,0.06)", color: tab === "perfil" ? theme.black : theme.gray300, transition: "background 0.15s" }}
-          >
-            <UserIcon size={15} /> Mi Perfil
-          </button>
-          <button
-            onClick={() => setTab("turnos")}
-            style={{ display: "flex", alignItems: "center", gap: 7, padding: "10px 18px", borderRadius: 10, fontSize: "0.88rem", fontWeight: 600, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", border: "none", background: tab === "turnos" ? theme.orange : "rgba(255,255,255,0.06)", color: tab === "turnos" ? theme.black : theme.gray300, transition: "background 0.15s" }}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-            </svg>
-            Mis Turnos
-          </button>
+        <div className="panel-tabs-top" style={{ gap: 6, flexWrap: "wrap", alignItems: "center", paddingTop: 14 }}>
+          {panelTabs.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              aria-current={tab === t.key ? "page" : undefined}
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 12px", borderRadius: 10, fontSize: "0.9rem", fontWeight: 600, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", border: "none", background: tab === t.key ? "rgba(235,136,0,0.15)" : "rgba(255,255,255,0.05)", color: tab === t.key ? theme.orange : theme.gray200 }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{panelNavIcons[t.key]}</svg>
+              {t.label}
+            </button>
+          ))}
           <button
             onClick={() => navigate("turnos")}
-            style={{ display: "flex", alignItems: "center", gap: 7, padding: "10px 18px", borderRadius: 10, fontSize: "0.88rem", fontWeight: 700, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", border: "none", background: theme.orange, color: theme.black }}
+            style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 12px", borderRadius: 10, fontSize: "0.9rem", fontWeight: 700, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", border: "none", background: theme.orange, color: theme.black }}
           >
-            + Solicitar turno
+            <PlusIcon size={16} /> Pedir turno
           </button>
         </div>
       </div>
 
+      {tab === "inicio" && <InicioTab user={user} apiFetch={apiFetch} navigate={navigate} setTab={setTab} />}
+      {tab === "turnos" && <TurnosTab apiFetch={apiFetch} navigate={navigate} />}
+      {tab === "multas" && <MultasTab apiFetch={apiFetch} />}
+      {tab === "perfil" && (
+        <>
+          <VencimientosBanner user={user} />
+          <ProfileTab user={user} apiFetch={apiFetch} onUpdate={onUserUpdate} />
+        </>
+      )}
+
+      {/* Barra fija de abajo, como en una app (solo en el celular) */}
+      <nav className="panel-nav-bottom" aria-label="Secciones del panel" style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 98, background: theme.gray900, borderTop: "1px solid rgba(255,255,255,0.1)", paddingBottom: "env(safe-area-inset-bottom)" }}>
+        <div style={{ maxWidth: 560, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(4, 1fr)" }}>
+          {panelTabs.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              aria-current={tab === t.key ? "page" : undefined}
+              style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: "10px 0 12px", minHeight: 60, background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: "0.8rem", fontWeight: 700, color: tab === t.key ? theme.orange : theme.gray300 }}
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{panelNavIcons[t.key]}</svg>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </nav>
+    </div>
+  );
+}
+
+/* ── Inicio: lo que el conductor necesita ver de un vistazo ── */
+function InicioTab({ user, apiFetch, navigate, setTab }) {
+  const [turnos, setTurnos] = useState(null); // null = todavía cargando
+  const [turnosError, setTurnosError] = useState(false);
+  const [multasData, setMultasData] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    fetchAllTurnos(apiFetch)
+      .then((all) => { if (alive) setTurnos(all); })
+      .catch(() => { if (alive) { setTurnos([]); setTurnosError(true); } });
+    // Si las multas no cargan, el aviso simplemente no aparece (el detalle está en su sección)
+    apiFetch("/mis-multas")
+      .then((res) => res.json())
+      .then((data) => { if (alive) setMultasData(data); })
+      .catch(() => {});
+    return () => { alive = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const proximo = (turnos || []).filter(isTurnoProximo).sort((a, b) => (a.scheduled_date ?? "").localeCompare(b.scheduled_date ?? ""))[0];
+
+  const pendientes = (multasData?.multas || []).filter((m) => !m.cobrado);
+  const totalAdeudado = multasData?.total_adeudado ?? pendientes.reduce((sum, m) => sum + Number(m.monto_adeudado || 0), 0);
+
+  const licenciaDays = user.licenciaVencimiento ? daysUntil(user.licenciaVencimiento) : null;
+  const licenciaAlert = licenciaDays !== null && licenciaDays <= 30;
+
+  const auto = user.autoAsignado;
+  const rowStyle = { ...panel.card, display: "flex", alignItems: "center", gap: 14, padding: 16, width: "100%", textAlign: "left", color: theme.white, fontFamily: "'DM Sans', sans-serif" };
+
+  return (
+    <div className="anim-in panel-cols" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+
+      {/* Próximo turno */}
+      {turnos === null ? (
+        <div style={{ ...panel.card, padding: 20 }}><Skel w={130} h={12} mb={12} /><Skel w="80%" h={26} mb={10} /><Skel w="60%" h={14} /></div>
+      ) : proximo ? (
+        <section style={{ background: theme.orange, color: theme.black, borderRadius: 20, padding: 20, display: "flex", flexDirection: "column", gap: 6 }}>
+          <p style={{ fontSize: "0.9rem", fontWeight: 700, margin: 0 }}>Tu próximo turno</p>
+          <p style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.7rem", lineHeight: 1.15, margin: 0 }}>{dayLabel(turnoDay(proximo))}</p>
+          <p style={{ fontSize: "1rem", fontWeight: 500, margin: 0 }}>{proximo.service} · {proximo.type === "emergencia" ? "Turno urgente" : "Turno normal"}</p>
+          <button onClick={() => setTab("turnos")} style={{ ...panel.btn, minHeight: 48, fontSize: "1rem", borderRadius: 12, marginTop: 10, background: theme.black, color: theme.white, border: "none" }}>Ver mis turnos</button>
+        </section>
+      ) : (
+        <section style={{ ...panel.card, padding: 20 }}>
+          <p style={{ fontSize: "0.9rem", fontWeight: 700, color: theme.gray300, margin: "0 0 4px" }}>Tu próximo turno</p>
+          <p style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0 }}>{turnosError ? "No pudimos cargar tus turnos." : "No tienes turnos agendados."}</p>
+        </section>
+      )}
+
+      <button onClick={() => navigate("turnos")} style={panel.btnOutline}>
+        <span style={{ color: theme.orange, display: "flex" }}><PlusIcon /></span> Pedir un turno
+      </button>
+
+      {/* Avisos */}
+      {(pendientes.length > 0 || licenciaAlert) && (
+        <section style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <h2 style={panel.h2}>Para tener en cuenta</h2>
+
+          {pendientes.length > 0 && (
+            <button onClick={() => setTab("multas")} style={{ ...rowStyle, cursor: "pointer" }}>
+              <span style={{ color: "#ff8a80", display: "flex", flexShrink: 0 }}><AlertIcon size={26} /></span>
+              <span style={{ flex: 1 }}>
+                <span style={{ display: "block", fontSize: "1.05rem", fontWeight: 700 }}>
+                  Tienes {pendientes.length} multa{pendientes.length !== 1 ? "s" : ""} pendiente{pendientes.length !== 1 ? "s" : ""}
+                </span>
+                <span style={{ display: "block", fontSize: "0.95rem", color: theme.gray300 }}>
+                  {totalAdeudado > 0 ? `Debes ${fmtMoney(totalAdeudado)} en total` : "Toca para ver el detalle"}
+                </span>
+              </span>
+              <span style={{ color: theme.gray300, display: "flex" }}><ChevronIcon /></span>
+            </button>
+          )}
+
+          {licenciaAlert && (
+            <div style={rowStyle}>
+              <span style={{ color: licenciaDays <= 7 ? "#ff8a80" : theme.orange, display: "flex", flexShrink: 0 }}><AlertIcon size={26} /></span>
+              <span>
+                <span style={{ display: "block", fontSize: "1.05rem", fontWeight: 700 }}>
+                  {licenciaDays <= 0 ? "Tu licencia está vencida" : `Tu licencia vence en ${licenciaDays} día${licenciaDays !== 1 ? "s" : ""}`}
+                </span>
+                <span style={{ display: "block", fontSize: "0.95rem", color: theme.gray300 }}>
+                  {licenciaDays <= 0 ? "Renuévala lo antes posible." : `Vence el ${shortDate(user.licenciaVencimiento)}. Recuerda renovarla.`}
+                </span>
+              </span>
+            </div>
+          )}
+        </section>
+      )}
+
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+
+      {/* Auto asignado */}
+      <section style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <h2 style={{ ...panel.h2, marginTop: 0 }}>Tu auto</h2>
+        {auto ? (
+          <div style={{ ...panel.card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+            <div>
+              <p style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.35rem", margin: 0 }}>{auto.model}</p>
+              {auto.desde && <p style={panel.muted}>Lo usas desde el {auto.desde}</p>}
+            </div>
+            <span style={{ padding: "8px 12px", borderRadius: 8, background: theme.white, color: theme.black, fontFamily: "'Archivo Black', sans-serif", fontSize: "1.1rem", letterSpacing: 1, whiteSpace: "nowrap" }}>{fmtPatente(auto.patente)}</span>
+          </div>
+        ) : (
+          <div style={panel.card}><p style={panel.muted}>Todavía no tienes un vehículo asignado.</p></div>
+        )}
+      </section>
+
+      <a href={driverWhatsAppHref()} target="_blank" rel="noopener noreferrer" style={{ ...panel.btn, ...panel.card, padding: "0 18px", color: theme.white, marginTop: 6 }}>
+        <ChatIcon /> Hablar con la central
+      </a>
+      </div>
+    </div>
+  );
+}
+
+/* ── Multas del conductor ── */
+function MultasTab({ apiFetch }) {
+  const [data, setData] = useState(null); // null = todavía cargando
+  const [error, setError] = useState("");
+  const [showPagadas, setShowPagadas] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    apiFetch("/mis-multas")
+      .then(async (res) => {
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.message || "");
+        if (alive) setData(json);
+      })
+      .catch(() => { if (alive) setError("No se pudieron cargar tus multas. Intenta de nuevo en un rato."); });
+    return () => { alive = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (error) return <p style={{ ...panel.muted, color: "#ff8a80", padding: "32px 0", textAlign: "center" }}>{error}</p>;
+  if (data === null) return <p style={{ ...panel.muted, padding: "32px 0", textAlign: "center" }}>Cargando multas...</p>;
+
+  const multas = data.multas || [];
+  // Para el conductor una multa "cobrada" es una multa pagada
+  const pagadas = multas.filter((m) => m.cobrado);
+  // Pendientes: primero las que están por vencer (la más cercana arriba), después las ya vencidas
+  const pendientes = multas.filter((m) => !m.cobrado).sort((a, b) => {
+    const da = daysUntil(a.fecha_vencimiento || a.fecha), db = daysUntil(b.fecha_vencimiento || b.fecha);
+    if ((da < 0) !== (db < 0)) return da < 0 ? 1 : -1;
+    return da < 0 ? db - da : da - db;
+  });
+  const total = data.total_adeudado ?? pendientes.reduce((sum, m) => sum + Number(m.monto_adeudado || 0), 0);
+
+  if (multas.length === 0) return <div className="anim-in" style={panel.card}><p style={{ ...panel.muted, fontSize: "1.05rem" }}>No tienes multas registradas.</p></div>;
+
+  return (
+    <div className="anim-in" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+
+      <section style={{ ...panel.card, borderRadius: 20, padding: 20 }}>
+        <p style={panel.muted}>{pendientes.length > 0 ? "Debes en total" : "Estás al día"}</p>
+        <p style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "clamp(1.8rem, 8vw, 2.2rem)", lineHeight: 1.15, margin: "2px 0" }}>{fmtMoney(total)}</p>
+        <p style={{ ...panel.muted, fontSize: "1rem", color: theme.gray200 }}>
+          {pendientes.length === 0 ? "No tienes multas pendientes" : `${pendientes.length} multa${pendientes.length !== 1 ? "s" : ""} pendiente${pendientes.length !== 1 ? "s" : ""}`}
+        </p>
+      </section>
+
+      {pendientes.length > 0 && (
+        <section style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <h2 style={panel.h2}>Pendientes</h2>
+          <MultasList multas={pendientes} />
+        </section>
+      )}
+
+      {pagadas.length > 0 && (
+        <section style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 6 }}>
+          <button onClick={() => setShowPagadas((v) => !v)} aria-expanded={showPagadas} style={{ ...panel.btn, ...panel.card, padding: "0 18px", minHeight: 60, justifyContent: "space-between", color: theme.white }}>
+            <span>Pagadas ({pagadas.length})</span>
+            <span style={{ color: theme.gray300, display: "flex" }}><ChevronIcon size={22} dir={showPagadas ? "up" : "down"} /></span>
+          </button>
+          {showPagadas && <MultasList multas={pagadas} />}
+        </section>
+      )}
+
+      <a href={driverWhatsAppHref("¡Hola! Soy conductor de KPCars y tengo una consulta sobre una multa.")} target="_blank" rel="noopener noreferrer" style={{ ...panel.btn, minHeight: 52, fontSize: "1rem", color: theme.gray200 }}>
+        <ChatIcon size={20} /> ¿Dudas con una multa? Escríbenos
+      </a>
+    </div>
+  );
+}
+
+/* Lista de multas: un renglón por multa.
+   En pantallas grandes es una tabla con encabezados; en el celular cada renglón se apila en tres líneas. */
+function MultasList({ multas }) {
+  return (
+    <div style={{ ...panel.card, padding: 0, overflow: "hidden" }}>
       <style>{`
-        @media (max-width: 640px) {
-          .dash-header { flex-direction: column !important; }
-          .dash-header > div:last-child { width: 100%; }
-          .dash-header > div:last-child button { flex: 1 1 auto; justify-content: center; }
+        .multa-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "motivo monto" "fecha vence" "auto pdf"; gap: 10px 14px; padding: 16px 18px; border-top: 1px solid rgba(255,255,255,0.08); }
+        .multa-head + .multa-row { border-top: none; }
+        .multa-head { display: none; }
+        .multa-motivo { grid-area: motivo; } .multa-fecha { grid-area: fecha; } .multa-vence { grid-area: vence; }
+        .multa-auto { grid-area: auto; align-self: center; } .multa-monto { grid-area: monto; text-align: right; } .multa-pdf { grid-area: pdf; justify-self: end; }
+        @media (min-width: 768px) {
+          .multa-row, .multa-head { display: grid; grid-template-columns: minmax(0, 1fr) 96px 120px 130px 150px 84px; grid-template-areas: "motivo fecha vence auto monto pdf"; gap: 14px; align-items: center; }
+          .multa-head { padding: 12px 18px; background: rgba(255,255,255,0.03); font-size: 0.82rem; font-weight: 700; color: ${theme.gray300}; }
+          .multa-head + .multa-row { border-top: 1px solid rgba(255,255,255,0.08); }
+          .multa-lbl { display: none !important; }
         }
       `}</style>
+      <div className="multa-head">
+        <span>Motivo</span><span>Fecha</span><span>Vencimiento</span><span>Patente · Jurisd.</span><span style={{ textAlign: "right" }}>Monto</span><span />
+      </div>
+      {multas.map((m) => <MultaRow key={m.id} m={m} />)}
+    </div>
+  );
+}
 
-      <VencimientosBanner user={user} />
+function MultaRow({ m }) {
+  const vencimiento = m.fecha_vencimiento;
+  const days = vencimiento ? daysUntil(vencimiento) : null;
+  const vencida = days !== null && days < 0;
+  const monto = Number(m.monto || 0);
+  const adeudado = Number(m.monto_adeudado || 0);
+  const sinMonto = m.sin_importe || monto === 0;
+  const pdf = toAbsoluteUrl(m.pdf_url);
 
-      {tab === "perfil" && <ProfileTab user={user} apiFetch={apiFetch} onUpdate={onUserUpdate} />}
-      {tab === "turnos" && <TurnosTab user={user} apiFetch={apiFetch} navigate={navigate} />}
+  // Etiqueta de estado: pagada, vencida o cuánto falta (solo si falta un mes o menos)
+  let chip = null;
+  if (m.cobrado) chip = <span style={panel.chip("#8fd9a8", "rgba(76,175,80,0.14)")}>Pagada</span>;
+  else if (vencida) chip = <span style={panel.chip("#ff9d94", "rgba(255,82,82,0.16)")}>Vencida</span>;
+  else if (days === 0) chip = <span style={panel.chip("#ffb347", "rgba(235,136,0,0.16)")}>Vence hoy</span>;
+  else if (days !== null && days <= 30) chip = <span style={panel.chip("#ffb347", "rgba(235,136,0,0.16)")}>Vence en {days} día{days !== 1 ? "s" : ""}</span>;
+
+  // Los rótulos chicos solo se ven en el celular (en pantallas grandes están en el encabezado)
+  const lbl = { display: "block", fontSize: "0.85rem", color: theme.gray300 };
+  const val = { fontSize: "1rem", fontWeight: 500 };
+
+  return (
+    <div className="multa-row">
+      <div className="multa-motivo">
+        <p style={{ fontSize: "1.1rem", fontWeight: 700, lineHeight: 1.25, margin: 0 }}>{sentenceCase(m.descripcion)}</p>
+        {m.punto_rojo && <span style={{ ...panel.chip(theme.gray200, "rgba(255,255,255,0.1)"), marginTop: 6 }}>Punto rojo</span>}
+      </div>
+      <div className="multa-fecha">
+        <span className="multa-lbl" style={lbl}>Fecha de la multa</span>
+        <span style={val}>{shortDate(m.fecha)}</span>
+      </div>
+      <div className="multa-vence">
+        <span className="multa-lbl" style={lbl}>{vencida ? "Venció el" : "Vence el"}</span>
+        <span style={{ ...val, display: "block" }}>{shortDate(vencimiento)}</span>
+        {chip && <span style={{ display: "block", marginTop: 4 }}>{chip}</span>}
+      </div>
+      <div className="multa-auto" style={val}>{fmtPatente(m.patente)} · {m.jurisdiccion || "—"}</div>
+      <div className="multa-monto">
+        <p style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, whiteSpace: "nowrap" }}>
+          {sinMonto ? "A confirmar" : fmtMoney(m.cobrado ? monto : adeudado)}
+        </p>
+        {!sinMonto && !m.cobrado && adeudado < monto && (
+          <p style={{ fontSize: "0.82rem", color: theme.gray300, margin: 0 }}>Pagaste {fmtMoney(monto - adeudado)} de {fmtMoney(monto)}</p>
+        )}
+      </div>
+      <div className="multa-pdf">
+        {pdf && (
+          <a href={pdf} target="_blank" rel="noopener noreferrer" aria-label={`Ver la multa en PDF: ${sentenceCase(m.descripcion)} del ${shortDate(m.fecha)}`}
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, minHeight: 44, padding: "0 4px", color: theme.orange, fontSize: "0.95rem", fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap" }}>
+            <DocumentIcon size={18} /> Ver PDF
+          </a>
+        )}
+      </div>
     </div>
   );
 }
@@ -1938,59 +2339,29 @@ function PlateDisplay({ patente }) {
   );
 }
 
-/* ── Icono refresh ── */
-const RefreshIcon = ({ size = 18, spinning = false }) => (
-  <>
-    <style>{`@keyframes spin-icon { to { transform: rotate(360deg); } }`}</style>
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-      style={{ animation: spinning ? "spin-icon 0.8s linear infinite" : "none" }}>
-      <polyline points="23 4 23 10 17 10" />
-      <polyline points="1 20 1 14 7 14" />
-      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-    </svg>
-  </>
-);
-
 /* ── Turnos del conductor ── */
 function TurnosTab({ apiFetch, navigate }) {
   const [turnos, setTurnos] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState(null);
   const [error, setError] = useState("");
   const [cancelTarget, setCancelTarget] = useState(null);
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState("");
-  const [sortBy, setSortBy] = useState("turno"); // "turno" | "solicitud"
-  const [order, setOrder] = useState("desc"); // "desc" | "asc"
-  const [sortOpen, setSortOpen] = useState(false);
-  const sortRef = useRef(null);
+  const [showAll, setShowAll] = useState(false);
 
   const fetchTurnos = async (silent = false) => {
     if (!silent) setLoading(true);
-    else setRefreshing(true);
     try {
-      let page = 1;
-      let all = [];
-      while (true) {
-        const res = await apiFetch(`/mis-turnos?page=${page}`);
-        const data = await res.json();
-        const items = data.data || [];
-        all = [...all, ...items];
-        if (page >= (data.last_page || 1) || items.length === 0) break;
-        page++;
-      }
-      setTurnos(all);
-      setLastUpdated(new Date());
+      setTurnos(await fetchAllTurnos(apiFetch));
       setError("");
     } catch {
       if (!silent) setError("No se pudo cargar el historial de turnos.");
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   };
 
+  // Se actualiza solo al entrar y cada vez que el conductor vuelve a la página
   useEffect(() => {
     fetchTurnos(false);
     const onVisibility = () => { if (document.visibilityState === "visible") fetchTurnos(true); };
@@ -2003,33 +2374,6 @@ function TurnosTab({ apiFetch, navigate }) {
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    const handleOutside = (e) => { if (sortRef.current && !sortRef.current.contains(e.target)) setSortOpen(false); };
-    document.addEventListener("mousedown", handleOutside);
-    return () => document.removeEventListener("mousedown", handleOutside);
-  }, []);
-
-  const todayStr = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })();
-  const tomorrowStr = (() => { const d = new Date(); d.setDate(d.getDate()+1); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })();
-
-  const scheduledDay = (t) => t.scheduled_date?.split("T")[0] ?? "";
-  const requestedDay = (t) => t.created_at?.split("T")[0] ?? t.scheduled_date?.split("T")[0] ?? "";
-  const groupKey = (t) => sortBy === "turno" ? scheduledDay(t) : requestedDay(t);
-
-  const formatDayHeader = (dateStr) => {
-    if (!dateStr) return "—";
-    if (dateStr === todayStr) return "Hoy";
-    if (dateStr === tomorrowStr) return "Mañana";
-    return new Date(dateStr + "T12:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-  };
-
-  const statusConfig = {
-    agendado:   { label: "Agendado",    color: theme.orange,  bg: "rgba(235,136,0,0.1)"    },
-    completado: { label: "Completado",  color: "#4caf50",     bg: "rgba(76,175,80,0.1)"    },
-    en_proceso: { label: "En proceso",  color: "#29b6f6",     bg: "rgba(41,182,246,0.1)"   },
-    cancelado:  { label: "Cancelado",   color: theme.gray400, bg: "rgba(255,255,255,0.05)" },
-  };
 
   const handleCancelConfirm = async () => {
     if (!cancelTarget) return;
@@ -2050,266 +2394,96 @@ function TurnosTab({ apiFetch, navigate }) {
     }
   };
 
-  // Valor completo para ordenar (usa datetime, no solo día)
-  const sortValue = (t) => sortBy === "turno"
-    ? (t.scheduled_date ?? "")
-    : (t.created_at ?? t.scheduled_date ?? "");
+  if (loading) return <p style={{ ...panel.muted, padding: "32px 0", textAlign: "center" }}>Cargando turnos...</p>;
+  if (error) return <p style={{ ...panel.muted, color: "#ff8a80", padding: "32px 0", textAlign: "center" }}>{error}</p>;
 
-  // Ordenar todos los turnos por datetime completo
-  const sorted = [...(turnos || [])].sort((a, b) => {
-    const va = sortValue(a), vb = sortValue(b);
-    return order === "desc" ? vb.localeCompare(va) : va.localeCompare(vb);
-  });
+  // Próximos: el más cercano arriba. Anteriores: el más reciente arriba.
+  const byDate = (a, b) => (a.scheduled_date ?? "").localeCompare(b.scheduled_date ?? "");
+  const proximos = (turnos || []).filter(isTurnoProximo).sort(byDate);
+  const anteriores = (turnos || []).filter((t) => !isTurnoProximo(t)).sort((a, b) => byDate(b, a));
+  const anterioresVisibles = showAll ? anteriores : anteriores.slice(0, 5);
 
-  // Agrupar por día manteniendo el orden ya aplicado
-  const grouped = {};
-  sorted.forEach((t) => {
-    const key = groupKey(t);
-    if (!grouped[key]) grouped[key] = [];
-    grouped[key].push(t);
-  });
-
-  // Los días siguen el mismo orden que los turnos dentro
-  const allDays = [...new Set(sorted.map(groupKey))];
-
-  // En modo "turno": próximos y pasados respetan el order elegido
-  const upcomingDays = sortBy === "turno" ? allDays.filter((d) => d >= todayStr) : [];
-  const pastDays = sortBy === "turno" ? allDays.filter((d) => d < todayStr) : allDays;
-
-  const TurnoCard = ({ t }) => {
-    const s = statusConfig[t.status] || statusConfig.agendado;
-    const datePart = scheduledDay(t);
-    const canCancel = t.status === "agendado" && datePart >= todayStr;
-    // En modo "solicitud", mostrar la fecha del turno en la card
-    const subInfo = sortBy === "solicitud" && datePart
-      ? `Turno: ${new Date(datePart + "T12:00:00").toLocaleDateString("es-AR", { day: "numeric", month: "short", year: "numeric" })} · ${t.license_plate || ""}`
-      : (t.license_plate || "");
-    return (
-      <div className="turno-card" style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", background: "rgba(255,255,255,0.02)", borderRadius: 12, border: "1px solid rgba(255,255,255,0.05)" }}>
-        <div style={{ width: 44, height: 44, borderRadius: 10, background: s.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: s.color }}>
-          {t.type === "emergencia" ? <AlertIcon size={20} /> : <WrenchIcon size={20} />}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: "0.9rem", fontWeight: 600, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.service}</div>
-          {subInfo && <div style={{ fontSize: "0.78rem", color: theme.gray400 }}>{subInfo}</div>}
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          <div className="turno-badge" style={{ background: s.bg, color: s.color, fontSize: "0.72rem", fontWeight: 700, padding: "4px 10px", borderRadius: 20, textTransform: "uppercase", letterSpacing: 0.5 }}>
-            {s.label}
-          </div>
-          {canCancel && (
-            <button
-              onClick={() => { setCancelTarget(t); setCancelError(""); }}
-              title="Cancelar turno"
-              style={{ width: 30, height: 30, borderRadius: 8, background: "rgba(255,68,68,0.08)", border: "1px solid rgba(255,68,68,0.2)", color: "#ff6b6b", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
-            >
-              <CloseIcon size={14} />
-            </button>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  const DayGroup = ({ dateStr, items, accent = false }) => (
-    <div style={{ marginBottom: 20 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-        <span style={{ fontSize: "0.82rem", fontWeight: 700, color: accent ? theme.orange : theme.gray300 }}>
-          {formatDayHeader(dateStr)}
-        </span>
-        <span style={{ fontSize: "0.72rem", color: theme.gray400, fontWeight: 500 }}>
-          {dateStr && dateStr !== todayStr && dateStr !== tomorrowStr
-            ? new Date(dateStr + "T12:00:00").toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" })
-            : ""}
-        </span>
-        <div style={{ flex: 1, height: 1, background: accent ? "rgba(235,136,0,0.2)" : "rgba(255,255,255,0.06)" }} />
-        <span style={{ fontSize: "0.7rem", color: theme.gray400, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 20, padding: "2px 8px" }}>
-          {items.length} {items.length === 1 ? "turno" : "turnos"}
-        </span>
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {items.map((t) => <TurnoCard key={t.id} t={t} />)}
-      </div>
-    </div>
-  );
-
-  if (loading) return (
-    <div style={{ textAlign: "center", padding: "48px 0", color: theme.gray400 }}>Cargando turnos...</div>
-  );
-
-  if (error) return (
-    <div style={{ textAlign: "center", padding: "48px 0", color: "#ff6b6b", fontSize: "0.9rem" }}>{error}</div>
-  );
-
-  const cancelDateLabel = cancelTarget
-    ? new Date(scheduledDay(cancelTarget) + "T12:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" })
-    : "";
+  // "2026-09-14" → "Lunes 14 de septiembre de 2026"
+  const fechaConAnio = (d) => d ? capitalize(new Date(d + "T12:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })) : "—";
+  const tipoYPatente =(t) => [t.type === "emergencia" ? "Turno urgente" : "Turno normal", fmtPatente(t.license_plate)].filter((x) => x && x !== "—").join(" · ");
 
   return (
-    <div className="anim-in">
-      {/* Modal confirmación cancelación */}
+    <div className="anim-in" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+
+      {/* Confirmación antes de cancelar */}
       {cancelTarget && (
         <div
           onClick={() => !cancelling && setCancelTarget(null)}
           style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
         >
           <div onClick={(e) => e.stopPropagation()} style={{ background: theme.gray900, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "28px 24px", maxWidth: 400, width: "100%" }}>
-            <h3 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.1rem", marginBottom: 8 }}>¿Cancelar turno?</h3>
-            <p style={{ fontSize: "0.88rem", color: theme.gray400, lineHeight: 1.6, marginBottom: 6 }}>
-              Vas a cancelar el turno del <strong style={{ color: theme.white }}>{cancelDateLabel}</strong>.
+            <h3 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.3rem", marginBottom: 8 }}>¿Cancelar turno?</h3>
+            <p style={{ fontSize: "1rem", color: theme.gray300, lineHeight: 1.6, marginBottom: 6 }}>
+              Vas a cancelar el turno del <strong style={{ color: theme.white }}>{dayLabel(turnoDay(cancelTarget)).toLowerCase()}</strong>.
             </p>
-            <p style={{ fontSize: "0.82rem", color: "#ff8080", lineHeight: 1.5, marginBottom: 20 }}>
+            <p style={{ fontSize: "0.95rem", color: "#ff9d94", lineHeight: 1.5, marginBottom: 20 }}>
               Recuerda que 2 turnos perdidos o cancelados sin anticipación generan una penalidad económica.
             </p>
-            {cancelError && <p style={{ fontSize: "0.82rem", color: "#ff4444", marginBottom: 12 }}>{cancelError}</p>}
-            <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => setCancelTarget(null)} disabled={cancelling}
-                style={{ flex: 1, padding: "11px 0", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, color: theme.white, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: "0.88rem", cursor: "pointer" }}>
-                Volver
-              </button>
+            {cancelError && <p style={{ fontSize: "0.95rem", color: "#ff8a80", marginBottom: 12 }}>{cancelError}</p>}
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <button onClick={handleCancelConfirm} disabled={cancelling}
-                style={{ flex: 1, padding: "11px 0", background: cancelling ? theme.gray600 : "#c62828", border: "none", borderRadius: 10, color: theme.white, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: "0.88rem", cursor: cancelling ? "not-allowed" : "pointer" }}>
-                {cancelling ? "Cancelando..." : "Confirmar cancelación"}
+                style={{ ...panel.btn, minHeight: 52, fontSize: "1rem", borderRadius: 12, background: cancelling ? theme.gray600 : "#c62828", color: theme.white, border: "none", cursor: cancelling ? "not-allowed" : "pointer" }}>
+                {cancelling ? "Cancelando..." : "Sí, cancelar el turno"}
+              </button>
+              <button onClick={() => setCancelTarget(null)} disabled={cancelling} style={panel.btnQuiet}>
+                No, lo mantengo
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Header + Sort dropdown */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
+      <button className="panel-mobile-only" onClick={() => navigate("turnos")} style={panel.btnPrimary}><PlusIcon /> Pedir un turno</button>
 
-        {/* Dropdown ordenar */}
-        <div style={{ position: "relative" }} ref={sortRef}>
-          <button
-            onClick={() => setSortOpen((v) => !v)}
-            style={{
-              display: "flex", flexDirection: "column", gap: 3, padding: "9px 14px",
-              background: sortOpen ? "rgba(235,136,0,0.06)" : "rgba(255,255,255,0.04)",
-              border: `1px solid ${sortOpen ? "rgba(235,136,0,0.3)" : "rgba(255,255,255,0.1)"}`,
-              borderRadius: 10, cursor: "pointer", textAlign: "left", fontFamily: "'DM Sans', sans-serif",
-            }}
-          >
-            <span style={{ fontSize: "0.6rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: 2.5, color: theme.orange }}>Ordenar</span>
-            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-              <span style={{ fontSize: "0.85rem", fontWeight: 600, color: theme.white }}>
-                {sortBy === "turno" ? "Día de turno" : "Día de solicitud"}
-              </span>
-              <span style={{ color: theme.gray600, fontSize: "1rem", lineHeight: 1 }}>·</span>
-              <span style={{ fontSize: "0.85rem", color: theme.gray300 }}>
-                {order === "desc" ? "Más nuevo primero" : "Más viejo primero"}
-              </span>
-              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke={theme.gray400} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                {sortOpen ? <path d="M2 8L6 4L10 8" /> : <path d="M2 4L6 8L10 4" />}
-              </svg>
-            </div>
-          </button>
+      <section style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <h2 style={panel.h2}>{proximos.length > 1 ? "Próximos" : "Próximo"}</h2>
+        {proximos.length === 0 ? (
+          <div style={panel.card}><p style={{ ...panel.muted, fontSize: "1.05rem" }}>No tienes turnos agendados.</p></div>
+        ) : proximos.map((t) => {
+          const s = turnoStatus[t.status] || turnoStatus.agendado;
+          return (
+            <article key={t.id} style={{ ...panel.card, border: `1px solid ${theme.orange}`, display: "flex", flexDirection: "column", gap: 8 }}>
+              <span style={{ ...panel.chip(s.color, s.bg), alignSelf: "flex-start" }}>{s.label}</span>
+              <p style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.5rem", lineHeight: 1.15, margin: 0 }}>{dayLabel(turnoDay(t))}</p>
+              <p style={{ fontSize: "1rem", color: theme.gray200, margin: 0 }}>{t.service}</p>
+              <p style={panel.muted}>{tipoYPatente(t)}</p>
+              {t.status === "agendado" && (
+                <>
+                  <button onClick={() => { setCancelTarget(t); setCancelError(""); }} style={{ ...panel.btnQuiet, marginTop: 8 }}>Cancelar este turno</button>
+                  <p style={{ ...panel.muted, fontSize: "0.9rem" }}>Si no puedes ir, cancela con al menos 24 hs de anticipación para que no cuente como turno perdido.</p>
+                </>
+              )}
+            </article>
+          );
+        })}
+      </section>
 
-          {/* Panel desplegable */}
-          {sortOpen && (
-            <div style={{ position: "absolute", top: "calc(100% + 8px)", left: 0, zIndex: 50, background: theme.gray800, border: "1px solid rgba(255,255,255,0.1)", borderRadius: 14, padding: "10px 0", minWidth: 248, boxShadow: "0 16px 48px rgba(0,0,0,0.65)" }}>
-
-              {/* Campo de fecha */}
-              <p style={{ fontSize: "0.6rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: 2.5, color: theme.gray400, padding: "4px 16px 8px" }}>Campo de fecha</p>
-              {[
-                {
-                  value: "turno", label: "Día de turno",
-                  icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
-                },
-                {
-                  value: "solicitud", label: "Día de solicitud",
-                  icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
-                },
-              ].map((opt) => (
-                <button key={opt.value} onClick={() => setSortBy(opt.value)}
-                  style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 16px", background: sortBy === opt.value ? "rgba(235,136,0,0.1)" : "transparent", border: "none", color: sortBy === opt.value ? theme.white : theme.gray300, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: "0.88rem", fontWeight: sortBy === opt.value ? 600 : 400 }}>
-                  <span style={{ color: sortBy === opt.value ? theme.orange : theme.gray400 }}>{opt.icon}</span>
-                  <span style={{ flex: 1, textAlign: "left" }}>{opt.label}</span>
-                  {sortBy === opt.value && (
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={theme.orange} strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
-                  )}
-                </button>
-              ))}
-
-              <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "8px 0" }} />
-
-              {/* Dirección */}
-              <p style={{ fontSize: "0.6rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: 2.5, color: theme.gray400, padding: "4px 16px 8px" }}>Dirección</p>
-              {[
-                {
-                  value: "desc", label: "Más nuevo primero",
-                  icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>,
-                },
-                {
-                  value: "asc", label: "Más viejo primero",
-                  icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>,
-                },
-              ].map((opt) => (
-                <button key={opt.value} onClick={() => setOrder(opt.value)}
-                  style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 16px", background: order === opt.value ? "rgba(235,136,0,0.1)" : "transparent", border: "none", color: order === opt.value ? theme.white : theme.gray300, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: "0.88rem", fontWeight: order === opt.value ? 600 : 400 }}>
-                  <span style={{ color: order === opt.value ? theme.orange : theme.gray400 }}>{opt.icon}</span>
-                  <span style={{ flex: 1, textAlign: "left" }}>{opt.label}</span>
-                  {order === opt.value && (
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={theme.orange} strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Derecha: actualizado + botón actualizar */}
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          {lastUpdated && (
-            <p style={{ fontSize: "0.72rem", color: theme.gray400, display: "flex", alignItems: "center", gap: 5, margin: 0 }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#4caf50", display: "inline-block", flexShrink: 0 }} />
-              Actualizado {lastUpdated.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
-            </p>
-          )}
-          <button onClick={() => fetchTurnos(true)} disabled={refreshing} title="Actualizar turnos"
-            style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, color: theme.gray300, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: "0.8rem", cursor: refreshing ? "not-allowed" : "pointer", opacity: refreshing ? 0.6 : 1 }}>
-            <RefreshIcon size={14} spinning={refreshing} />
-            {refreshing ? "Actualizando…" : "Actualizar"}
-          </button>
-        </div>
-      </div>
-
-      {/* Contenido agrupado */}
-      {sortBy === "turno" ? (
-        <>
-          {/* Próximos */}
-          <div style={{ marginBottom: 32 }}>
-            <p style={{ fontSize: "0.78rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: theme.orange, marginBottom: 16 }}>Próximos</p>
-            {upcomingDays.length === 0 ? (
-              <div style={{ background: theme.gray900, border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: 24, textAlign: "center" }}>
-                <p style={{ color: theme.gray400, fontSize: "0.9rem", marginBottom: 14 }}>No tienes turnos agendados.</p>
-                <button onClick={() => navigate("turnos")}
-                  style={{ padding: "10px 20px", background: theme.orange, border: "none", borderRadius: 8, color: theme.black, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer" }}>
-                  Solicitar turno →
-                </button>
+      {anteriores.length > 0 && (
+        <section style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <h2 style={panel.h2}>Anteriores</h2>
+          {anterioresVisibles.map((t) => {
+            const s = turnoStatus[t.status] || turnoStatus.agendado;
+            return (
+              <div key={t.id} style={{ ...panel.card, padding: "14px 16px", borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                <div style={{ minWidth: 0, flex: "1 1 180px" }}>
+                  <p style={{ fontSize: "1rem", fontWeight: 700, margin: 0 }}>{fechaConAnio(turnoDay(t))}</p>
+                  <p style={panel.muted}>{t.service}</p>
+                </div>
+                <span style={panel.chip(s.color, s.bg)}>{s.label}</span>
               </div>
-            ) : (
-              upcomingDays.map((d) => <DayGroup key={d} dateStr={d} items={grouped[d]} accent={d === todayStr || d === tomorrowStr} />)
-            )}
-          </div>
-          {/* Historial */}
-          {pastDays.length > 0 && (
-            <div>
-              <p style={{ fontSize: "0.78rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: 2, color: theme.gray400, marginBottom: 16 }}>Historial</p>
-              {pastDays.map((d) => <DayGroup key={d} dateStr={d} items={grouped[d]} accent={false} />)}
-            </div>
+            );
+          })}
+          {anteriores.length > 5 && (
+            <button onClick={() => setShowAll((v) => !v)} style={panel.btnText}>
+              {showAll ? "Ver menos" : `Ver todos los anteriores (${anteriores.length})`}
+            </button>
           )}
-        </>
-      ) : (
-        <>
-          {allDays.length === 0 ? (
-            <div style={{ background: theme.gray900, border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: 24, textAlign: "center" }}>
-              <p style={{ color: theme.gray400, fontSize: "0.9rem" }}>No hay turnos registrados.</p>
-            </div>
-          ) : (
-            allDays.map((d) => <DayGroup key={d} dateStr={d} items={grouped[d]} accent={false} />)
-          )}
-        </>
+        </section>
       )}
     </div>
   );
@@ -2476,76 +2650,88 @@ function ChangePasswordPage({ token, onComplete }) {
 /* ─────────────────────────────────────────────
    TURNOS PAGE (formulario completo)
    ───────────────────────────────────────────── */
-function TurnosPage({ user, apiFetch, navigate }) {
+/* Pedir turno, paso a paso: 1) qué le pasa al auto  2) qué día  3) revisar y confirmar.
+   Un turno urgente no elige día: pasa directo del paso 1 al 3. */
+const TURNO_DAYS_AHEAD = 60;   // hasta cuántos días para adelante se puede pedir
+const TURNO_DAYS_PER_PAGE = 6; // cuántos días se muestran de entrada (y con cada "Ver más días")
+const TURNO_MAX_PER_DAY = 4;   // con esta cantidad de turnos normales, el día queda sin lugar
+
+function TurnosPage({ user, apiFetch }) {
+  const routerNavigate = useNavigate();
+  const [step, setStep] = useState(1);
   const [urgencia, setUrgencia] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [selectedDate, setSelectedDate] = useState(null);
   const [confirmed, setConfirmed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [currentMonth, setCurrentMonth] = useState(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1);
-  });
   const [fullDates, setFullDates] = useState([]);
   const [loadingDates, setLoadingDates] = useState(false);
-
-  const inputStyle = { width: "100%", padding: "14px 16px", background: theme.gray800, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, color: theme.white, fontFamily: "'DM Sans', sans-serif", fontSize: "0.95rem" };
+  const [daysShown, setDaysShown] = useState(TURNO_DAYS_PER_PAGE);
 
   const isUrgente = urgencia === "urgente";
+  const goToPanelTurnos = () => routerNavigate("/panel/turnos");
 
-  useEffect(() => {
-    if (isUrgente || !urgencia) return;
-    const y = currentMonth.getFullYear();
-    const m = currentMonth.getMonth();
-    const from = `${y}-${String(m + 1).padStart(2, "0")}-01`;
-    const lastDay = new Date(y, m + 1, 0).getDate();
-    const to = `${y}-${String(m + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+  // Averigua qué días ya están completos. Se pide mes por mes, igual que antes.
+  const loadFullDates = async () => {
     setLoadingDates(true);
-    apiFetch(`/sync-turnos?from=${from}&to=${to}`)
-      .then((res) => res.json())
-      .then((data) => {
-        const counts = {};
-        (data.appointments || []).forEach((apt) => {
-          if (apt.type?.toLowerCase() === "normal") {
-            const key = apt.scheduled_date?.split("T")[0] ?? "";
-            if (key) counts[key] = (counts[key] || 0) + 1;
-          }
-        });
-        setFullDates(Object.keys(counts).filter((d) => counts[d] >= 4));
-      })
-      .catch((err) => { console.error("sync-turnos error:", err); })
-      .finally(() => setLoadingDates(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentMonth, urgencia]);
-
-  const getAvailableDates = () => {
-    const y = currentMonth.getFullYear();
-    const m = currentMonth.getMonth();
-    const available = [];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    for (let d = 1; d <= 31; d++) {
-      const date = new Date(y, m, d);
-      if (date.getMonth() !== m) break;
-      const dateStr = `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-      if (date >= today && date.getDay() !== 0 && date.getDay() !== 3 && date.getDay() !== 6 && !fullDates.includes(dateStr)) {
-        available.push(dateStr);
-      }
+    try {
+      const start = new Date();
+      const end = new Date(); end.setDate(end.getDate() + TURNO_DAYS_AHEAD);
+      const months = [];
+      for (let m = new Date(start.getFullYear(), start.getMonth(), 1); m <= end; m = new Date(m.getFullYear(), m.getMonth() + 1, 1)) months.push(m);
+      const results = await Promise.all(months.map(async (m) => {
+        const y = m.getFullYear(), mo = m.getMonth();
+        const from = `${y}-${pad2(mo + 1)}-01`;
+        const to = `${y}-${pad2(mo + 1)}-${pad2(new Date(y, mo + 1, 0).getDate())}`;
+        const res = await apiFetch(`/sync-turnos?from=${from}&to=${to}`);
+        return res.json();
+      }));
+      const counts = {};
+      results.forEach((data) => (data.appointments || []).forEach((apt) => {
+        if (apt.type?.toLowerCase() === "normal") {
+          const key = apt.scheduled_date?.split("T")[0] ?? "";
+          if (key) counts[key] = (counts[key] || 0) + 1;
+        }
+      }));
+      setFullDates(Object.keys(counts).filter((d) => counts[d] >= TURNO_MAX_PER_DAY));
+    } catch (err) {
+      console.error("sync-turnos error:", err);
+    } finally {
+      setLoadingDates(false);
     }
-    return available;
   };
 
-  const availableDates = getAvailableDates();
-  const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
-  const firstDayOfWeek = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).getDay();
-  const startOffset = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
-  const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-  const dayNames = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+  // Días que se pueden ofrecer: de hoy en adelante, sin miércoles, sábados ni domingos
+  const dayOptions = [];
+  for (let i = 0; i <= TURNO_DAYS_AHEAD; i++) {
+    const d = new Date(); d.setDate(d.getDate() + i);
+    if ([0, 3, 6].includes(d.getDay())) continue;
+    const dateStr = localDateStr(d);
+    dayOptions.push({ dateStr, full: fullDates.includes(dateStr) });
+  }
 
-  const changeMonth = (dir) => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + dir, 1));
-    setSelectedDate(null);
+  const handleStep1 = () => {
+    if (!descripcion.trim()) { setError("Cuéntanos qué le pasa al auto o el motivo de la revisión."); return; }
+    if (!urgencia) { setError("Elige si es un turno normal o urgente."); return; }
+    setError("");
+    if (isUrgente) { setSelectedDate(null); setStep(3); }
+    else { setStep(2); loadFullDates(); }
+    window.scrollTo({ top: 0 });
+  };
+
+  const handleStep2 = () => {
+    if (!selectedDate) { setError("Elige un día para el turno."); return; }
+    setError("");
+    setStep(3);
+    window.scrollTo({ top: 0 });
+  };
+
+  const handleBack = () => {
+    setError("");
+    if (step === 1) goToPanelTurnos();
+    else if (step === 3 && isUrgente) setStep(1);
+    else setStep(step - 1);
   };
 
   const handleSubmit = async () => {
@@ -2569,7 +2755,7 @@ function TurnosPage({ user, apiFetch, navigate }) {
         method: "POST",
         body: JSON.stringify({
           service: descripcion,
-          preferred_date: isUrgente ? (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })() : selectedDate,
+          preferred_date: isUrgente ? localDateStr() : selectedDate,
           type: isUrgente ? "emergencia" : "normal",
         }),
       });
@@ -2591,263 +2777,210 @@ function TurnosPage({ user, apiFetch, navigate }) {
     }
   };
 
+  const wrap = { maxWidth: 560, margin: "0 auto", padding: "96px 20px 60px" };
+  const inputStyle = { width: "100%", padding: "14px 16px", background: theme.gray800, border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12, color: theme.white, fontFamily: "'DM Sans', sans-serif", fontSize: "1.05rem", outline: "none", boxSizing: "border-box" };
+  // "martes 6 de octubre"
+  const selectedDayText = selectedDate ? new Date(selectedDate + "T12:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" }) : "";
+
   if (confirmed) {
     return (
-      <div style={{ paddingTop: 84, maxWidth: 600, margin: "0 auto", padding: "84px 20px 80px" }}>
-        <div className="anim-in" style={{ textAlign: "center", padding: "40px 0" }}>
-          <div style={{ width: 72, height: 72, background: isUrgente ? "rgba(255,68,68,0.12)" : "rgba(235,136,0,0.12)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", fontSize: "2rem", color: isUrgente ? "#ff4444" : theme.orange }}>✓</div>
-          <h3 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.4rem", marginBottom: 10 }}>
-            {isUrgente ? "Turno urgente confirmado" : "Turno confirmado"}
-          </h3>
+      <div style={wrap}>
+        <div className="anim-in" style={{ textAlign: "center", padding: "32px 0" }}>
+          <div style={{ width: 72, height: 72, background: isUrgente ? "rgba(255,82,82,0.14)" : "rgba(235,136,0,0.14)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", fontSize: "2rem", color: isUrgente ? "#ff8a80" : theme.orange }}>✓</div>
+          <h1 style={{ ...panel.h1, fontSize: "1.8rem", marginBottom: 12 }}>{isUrgente ? "Turno urgente confirmado" : "Turno confirmado"}</h1>
           {isUrgente ? (
             <>
-              <p style={{ color: theme.gray400, fontSize: "0.95rem", lineHeight: 1.6, marginBottom: 6 }}>
-                Tu turno de emergencia quedó registrado. El taller fue notificado y te atenderán
-              </p>
-              <p style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.2rem", color: "#ff4444" }}>
-                a la brevedad posible.
-              </p>
-              <p style={{ color: theme.gray400, fontSize: "0.84rem", marginTop: 16, lineHeight: 1.5 }}>
-                Preséntate en el taller con el vehículo. Si no puedes asistir, cancela con anticipación para evitar penalidades.
-              </p>
+              <p style={{ ...panel.muted, fontSize: "1.05rem" }}>Tu turno de emergencia quedó registrado. El taller fue notificado y te atenderán</p>
+              <p style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.4rem", color: "#ff8a80", margin: "6px 0 0" }}>a la brevedad posible.</p>
+              <p style={{ ...panel.muted, marginTop: 16 }}>Preséntate en el taller con el vehículo. Si no puedes asistir, cancela con anticipación para evitar penalidades.</p>
             </>
           ) : (
             <>
-              <p style={{ color: theme.gray400, fontSize: "0.95rem", lineHeight: 1.6, marginBottom: 6 }}>
-                Tu turno quedó confirmado para el
-              </p>
-              <p style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.2rem", color: theme.orange }}>
+              <p style={{ ...panel.muted, fontSize: "1.05rem" }}>Tu turno quedó confirmado para el</p>
+              <p style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.4rem", color: theme.orange, margin: "6px 0 0" }}>
                 {new Date(selectedDate + "T12:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
               </p>
-              <p style={{ color: theme.gray400, fontSize: "0.84rem", marginTop: 16, lineHeight: 1.5 }}>
+              <p style={{ ...panel.muted, marginTop: 16 }}>
                 Preséntate puntual. Si no puedes asistir, cancela con al menos <strong style={{ color: theme.white }}>24 hs de anticipación</strong> para evitar que cuente como turno perdido.
               </p>
-              <button
-                onClick={() => navigate("dashboard")}
-                style={{ marginTop: 28, padding: "11px 24px", background: theme.orange, border: "none", borderRadius: 10, color: theme.black, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: "0.9rem", cursor: "pointer" }}
-              >
-                Volver al panel
-              </button>
             </>
           )}
+          <button onClick={goToPanelTurnos} style={{ ...panel.btnPrimary, marginTop: 28 }}>Ver mis turnos</button>
         </div>
       </div>
     );
   }
 
   return (
-    <div style={{ paddingTop: 84, maxWidth: 700, margin: "0 auto", padding: "84px 20px 80px" }}>
-      <div className="anim-in" style={{ marginBottom: 28 }}>
-        <SectionLabel>Revisión mecánica</SectionLabel>
-        <SectionTitle>Solicitar turno</SectionTitle>
-        <p style={{ fontSize: "0.95rem", color: theme.gray400, lineHeight: 1.6 }}>
-          Completa el formulario para pedir un turno de revisión para tu vehículo.
-        </p>
-      </div>
+    <div style={wrap}>
+      <div className="anim-in" style={{ display: "flex", flexDirection: "column", gap: 18 }}>
 
-      {/* Info del auto */}
-      {user.autoAsignado ? (
-        <div className="anim-in d1" style={{ background: theme.gray900, border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: 18, marginBottom: 24, display: "flex", alignItems: "center", gap: 14 }}>
-          <div style={{ width: 44, height: 44, borderRadius: 10, background: "rgba(235,136,0,0.1)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <CarIcon size={24} opacity={0.8} />
-          </div>
-          <div>
-            <div style={{ fontSize: "0.82rem", color: theme.gray400 }}>Vehículo</div>
-            <div style={{ fontWeight: 700, fontSize: "0.95rem" }}>{user.autoAsignado.model} · {user.autoAsignado.patente}</div>
-          </div>
-        </div>
-      ) : (
-        <div className="anim-in d1" style={{ background: "rgba(235,136,0,0.06)", border: "1px solid rgba(235,136,0,0.2)", borderRadius: 14, padding: 18, marginBottom: 24, display: "flex", alignItems: "center", gap: 12 }}>
-          <AlertIcon size={18} />
-          <p style={{ fontSize: "0.88rem", color: theme.gray300, lineHeight: 1.5 }}>
-            Todavía no tienes un vehículo asignado. Puedes igualmente solicitar un turno y el sistema lo vinculará una vez que se te asigne uno.
-          </p>
-        </div>
-      )}
+        <button onClick={handleBack} style={{ alignSelf: "flex-start", display: "flex", alignItems: "center", gap: 6, minHeight: 44, background: "none", border: "none", color: theme.gray200, fontFamily: "'DM Sans', sans-serif", fontSize: "1rem", fontWeight: 700, cursor: "pointer", padding: 0 }}>
+          <ChevronIcon dir="left" /> Volver
+        </button>
 
-      <div className="anim-in d2" style={{ background: theme.gray900, border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: "clamp(20px, 4vw, 32px)" }}>
-
-        {/* Descripción del problema */}
-        <div style={{ marginBottom: 22 }}>
-          <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, marginBottom: 7, color: theme.gray200 }}>
-            Descripción del problema o motivo <span style={{ color: theme.orange }}>*</span>
-          </label>
-          <textarea
-            value={descripcion}
-            onChange={(e) => setDescripcion(e.target.value)}
-            style={{ ...inputStyle, minHeight: 100, resize: "vertical" }}
-            placeholder="Ej: Hace ruido al frenar, service de rutina, problema con el aire acondicionado..."
-          />
-        </div>
-
-        {/* Urgencia */}
-        <div style={{ marginBottom: 28 }}>
-          <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, marginBottom: 10, color: theme.gray200 }}>
-            Nivel de urgencia <span style={{ color: theme.orange }}>*</span>
-          </label>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {[
-              { value: "normal", label: "Normal", desc: "Revisión de rutina, service o problema menor. Eliges el día en el calendario.", color: theme.orange, bgColor: "rgba(235,136,0,0.08)", borderColor: "rgba(235,136,0,0.2)" },
-              { value: "urgente", label: "Urgente", desc: "El vehículo tiene una falla grave que te impide trabajar hoy. Solo usa esta opción si realmente no puedes circular.", color: "#ff4444", bgColor: "rgba(255,68,68,0.08)", borderColor: "rgba(255,68,68,0.3)" },
-            ].map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => { setUrgencia(opt.value); if (opt.value === "urgente") setSelectedDate(null); }}
-                style={{
-                  display: "flex", alignItems: "flex-start", gap: 12, padding: 16,
-                  background: urgencia === opt.value ? opt.bgColor : "transparent",
-                  border: urgencia === opt.value ? `2px solid ${opt.borderColor}` : "1px solid rgba(255,255,255,0.06)",
-                  borderRadius: 12, cursor: "pointer", textAlign: "left",
-                  fontFamily: "'DM Sans', sans-serif",
-                }}
-              >
-                <div style={{
-                  width: 20, height: 20, borderRadius: "50%", flexShrink: 0, marginTop: 2,
-                  border: urgencia === opt.value ? `6px solid ${opt.color}` : "2px solid rgba(255,255,255,0.2)",
-                  background: "transparent",
-                }} />
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: "0.92rem", color: urgencia === opt.value ? opt.color : theme.white, marginBottom: 2 }}>{opt.label}</div>
-                  <div style={{ fontSize: "0.8rem", color: theme.gray400, lineHeight: 1.4 }}>{opt.desc}</div>
-                </div>
-              </button>
-            ))}
+        {/* En qué paso está */}
+        <div>
+          <p style={{ fontSize: "0.9rem", fontWeight: 700, color: theme.orange, margin: "0 0 10px" }}>Paso {step} de 3</p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+            {[1, 2, 3].map((n) => <div key={n} style={{ height: 6, borderRadius: 3, background: n <= step ? theme.orange : theme.gray700 }} />)}
           </div>
         </div>
 
-        {/* Aviso de urgente */}
-        {isUrgente && (
-          <div className="anim-in" style={{ background: "rgba(255,68,68,0.08)", border: "1px solid rgba(255,68,68,0.35)", borderRadius: 12, padding: 18, marginBottom: 24 }}>
-            <p style={{ fontSize: "0.9rem", color: "#ff4444", fontWeight: 700, marginBottom: 6, display: "flex", alignItems: "center", gap: 7 }}><AlertIcon size={16} /> Atención: turno de emergencia</p>
-            <p style={{ fontSize: "0.84rem", color: theme.gray300, lineHeight: 1.55 }}>
-              Esta opción es exclusivamente para fallas graves que <strong style={{ color: theme.white }}>te impiden circular hoy</strong>. No es para adelantar revisiones ni evitar espera.
-            </p>
-            <p style={{ fontSize: "0.82rem", color: "#ff6b6b", marginTop: 8, lineHeight: 1.5 }}>
-              El uso indebido de turnos urgentes puede derivar en <strong>penalidades económicas</strong> y restricción del sistema.
-            </p>
-          </div>
+        {/* ── Paso 1: qué le pasa al auto ── */}
+        {step === 1 && (
+          <>
+            <h1 style={{ ...panel.h1, fontSize: "clamp(1.6rem, 7vw, 1.9rem)" }}>¿Qué le pasa al auto?</h1>
+
+            {!user.autoAsignado && (
+              <div style={{ ...panel.card, display: "flex", gap: 12, borderColor: "rgba(235,136,0,0.3)" }}>
+                <span style={{ color: theme.orange, display: "flex", flexShrink: 0 }}><AlertIcon size={20} /></span>
+                <p style={panel.muted}>Todavía no tienes un vehículo asignado. Puedes igualmente solicitar un turno y el sistema lo vinculará una vez que se te asigne uno.</p>
+              </div>
+            )}
+
+            <div>
+              <label htmlFor="turno-descripcion" style={{ display: "block", fontSize: "1rem", fontWeight: 700, marginBottom: 8 }}>Cuéntanos el problema o el motivo</label>
+              <textarea
+                id="turno-descripcion"
+                value={descripcion}
+                onChange={(e) => setDescripcion(e.target.value)}
+                style={{ ...inputStyle, minHeight: 110, resize: "vertical" }}
+                placeholder="Ej: Hace ruido al frenar, service de rutina, problema con el aire acondicionado..."
+              />
+            </div>
+
+            <div>
+              <p style={{ fontSize: "1rem", fontWeight: 700, margin: "0 0 10px" }}>¿Es urgente?</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {[
+                  { value: "normal", label: "No, es un turno normal", desc: "Revisión de rutina, service o problema menor. Eliges el día en el paso siguiente.", color: theme.orange, bgColor: "rgba(235,136,0,0.1)" },
+                  { value: "urgente", label: "Sí, es urgente", desc: "El vehículo tiene una falla grave que te impide trabajar hoy. Solo usa esta opción si realmente no puedes circular.", color: "#ff8a80", bgColor: "rgba(255,82,82,0.1)" },
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => { setUrgencia(opt.value); if (opt.value === "urgente") setSelectedDate(null); }}
+                    aria-pressed={urgencia === opt.value}
+                    style={{
+                      display: "flex", alignItems: "flex-start", gap: 12, padding: 16,
+                      background: urgencia === opt.value ? opt.bgColor : "transparent",
+                      border: `2px solid ${urgencia === opt.value ? opt.color : "rgba(255,255,255,0.14)"}`,
+                      borderRadius: 14, cursor: "pointer", textAlign: "left",
+                      fontFamily: "'DM Sans', sans-serif",
+                    }}
+                  >
+                    <div style={{
+                      width: 22, height: 22, borderRadius: "50%", flexShrink: 0, marginTop: 2, boxSizing: "border-box",
+                      border: urgencia === opt.value ? `7px solid ${opt.color}` : "2px solid rgba(255,255,255,0.35)",
+                    }} />
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: "1.05rem", color: urgencia === opt.value ? opt.color : theme.white, marginBottom: 2 }}>{opt.label}</div>
+                      <div style={{ fontSize: "0.95rem", color: theme.gray300, lineHeight: 1.4 }}>{opt.desc}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {isUrgente && (
+              <div className="anim-in" style={{ background: "rgba(255,82,82,0.08)", border: "1px solid rgba(255,82,82,0.35)", borderRadius: 14, padding: 18 }}>
+                <p style={{ fontSize: "1rem", color: "#ff8a80", fontWeight: 700, margin: "0 0 6px", display: "flex", alignItems: "center", gap: 7 }}><AlertIcon size={18} /> Atención: turno de emergencia</p>
+                <p style={{ ...panel.muted, color: theme.gray200 }}>
+                  Esta opción es exclusivamente para fallas graves que <strong style={{ color: theme.white }}>te impiden circular hoy</strong>. No es para adelantar revisiones ni evitar espera.
+                </p>
+                <p style={{ ...panel.muted, color: "#ff9d94", marginTop: 8 }}>
+                  El uso indebido de turnos urgentes puede derivar en <strong>penalidades económicas</strong> y restricción del sistema.
+                </p>
+              </div>
+            )}
+
+            {error && <p style={{ color: "#ff8a80", fontSize: "1rem", margin: 0 }}>{error}</p>}
+            <button onClick={handleStep1} style={panel.btnPrimary}>Seguir</button>
+          </>
         )}
 
-        {/* Calendario — solo si NO es urgente */}
-        {!isUrgente && urgencia && (
-          <div className="anim-in">
-            <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 700, marginBottom: 12, color: theme.gray200 }}>
-              Elige un día disponible <span style={{ color: theme.orange }}>*</span>
-            </label>
+        {/* ── Paso 2: qué día ── */}
+        {step === 2 && (
+          <>
+            <h1 style={{ ...panel.h1, fontSize: "clamp(1.6rem, 7vw, 1.9rem)" }}>¿Qué día te queda bien?</h1>
 
-            {/* Navegación del mes */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <button onClick={() => changeMonth(-1)} disabled={currentMonth.getFullYear() === new Date().getFullYear() && currentMonth.getMonth() === new Date().getMonth()} style={{ background: "rgba(255,255,255,0.06)", border: "none", color: theme.white, width: 36, height: 36, borderRadius: 8, fontSize: "1.1rem", cursor: (currentMonth.getFullYear() === new Date().getFullYear() && currentMonth.getMonth() === new Date().getMonth()) ? "not-allowed" : "pointer", opacity: (currentMonth.getFullYear() === new Date().getFullYear() && currentMonth.getMonth() === new Date().getMonth()) ? 0.3 : 1 }}>‹</button>
-              <span style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.05rem" }}>
-                {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
-              </span>
-              <button onClick={() => changeMonth(1)} style={{ background: "rgba(255,255,255,0.06)", border: "none", color: theme.white, width: 36, height: 36, borderRadius: 8, cursor: "pointer", fontSize: "1.1rem" }}>›</button>
-            </div>
-
-            {/* Nombres de días */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 4 }}>
-              {dayNames.map((d) => (
-                <div key={d} style={{ textAlign: "center", fontSize: "0.72rem", fontWeight: 700, color: theme.gray400, padding: "6px 0", textTransform: "uppercase", letterSpacing: 1 }}>{d}</div>
-              ))}
-            </div>
-
-            {/* Grilla */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 16, opacity: loadingDates ? 0.4 : 1, transition: "opacity 0.2s", pointerEvents: loadingDates ? "none" : "auto" }}>
-              {Array.from({ length: startOffset }, (_, i) => <div key={`e-${i}`} />)}
-              {Array.from({ length: daysInMonth }, (_, i) => {
-                const day = i + 1;
-                const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-                const dateObj = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-                const todayObj = new Date(); todayObj.setHours(0, 0, 0, 0);
-                const dow = dateObj.getDay();
-                const isPast = dateObj < todayObj;
-                const isToday = dateObj.getTime() === todayObj.getTime();
-                const isNonWorking = dow === 0 || dow === 3 || dow === 6;
-                const isAvailable = availableDates.includes(dateStr);
-                const isFull = !isNonWorking && !isPast && fullDates.includes(dateStr);
-                const isSelected = selectedDate === dateStr;
-
-                let bg, color, border, cursor, textDecoration;
-                if (isSelected) {
-                  bg = "rgba(235,136,0,0.15)"; color = theme.orange; border = `2px solid ${theme.orange}`; cursor = "pointer";
-                } else if (isAvailable) {
-                  bg = "rgba(255,255,255,0.04)"; color = theme.white; border = "1px solid transparent"; cursor = "pointer";
-                } else if (isFull) {
-                  bg = "rgba(255,70,70,0.07)"; color = "rgba(255,120,120,0.55)"; border = "1px solid rgba(255,70,70,0.15)"; cursor = "default"; textDecoration = "line-through";
-                } else {
-                  bg = "transparent"; color = isPast ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.1)"; border = "1px solid transparent"; cursor = "default";
-                }
-
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, opacity: loadingDates ? 0.4 : 1, pointerEvents: loadingDates ? "none" : "auto", transition: "opacity 0.2s" }}>
+              {dayOptions.slice(0, daysShown).map(({ dateStr, full }) => {
+                const selected = selectedDate === dateStr;
+                const date = new Date(dateStr + "T12:00:00");
+                const weekday = dateStr === localDateStr() ? "Hoy" : capitalize(date.toLocaleDateString("es-AR", { weekday: "long" }));
+                const dayMonth = date.toLocaleDateString("es-AR", { day: "numeric", month: "long" });
                 return (
                   <button
-                    key={day}
-                    onClick={() => isAvailable && setSelectedDate(dateStr)}
-                    disabled={!isAvailable}
-                    title={isFull ? "Sin cupo" : isNonWorking ? "No laborable" : isPast ? "Fecha pasada" : undefined}
-                    className="cal-day"
+                    key={dateStr}
+                    onClick={() => { setSelectedDate(dateStr); setError(""); }}
+                    disabled={full}
+                    aria-pressed={selected}
                     style={{
-                      aspectRatio: "1", border, borderRadius: 10, background: bg, color,
-                      fontFamily: "'DM Sans', sans-serif", fontWeight: isSelected ? 700 : isToday ? 700 : 500, fontSize: "0.88rem",
-                      cursor, display: "flex", alignItems: "center", justifyContent: "center",
-                      textDecoration: textDecoration || "none",
-                      outline: isToday && !isSelected ? "2px solid rgba(255,255,255,0.35)" : "none",
-                      outlineOffset: "-2px",
+                      minHeight: 76, borderRadius: 14, fontFamily: "'DM Sans', sans-serif",
+                      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
+                      cursor: full ? "default" : "pointer",
+                      background: selected ? theme.orange : full ? "transparent" : theme.gray900,
+                      border: selected ? `1px solid ${theme.orange}` : full ? "1px dashed rgba(255,255,255,0.22)" : "1px solid rgba(255,255,255,0.2)",
+                      color: selected ? theme.black : full ? theme.gray300 : theme.white,
                     }}
-                  >{day}</button>
+                  >
+                    <span style={{ fontSize: "0.9rem", fontWeight: selected ? 700 : 500, color: selected ? theme.black : theme.gray300 }}>{full ? `${weekday} ${dayMonth}` : weekday}</span>
+                    <span style={{ fontSize: full ? "1rem" : "1.2rem", fontWeight: 700 }}>{full ? "Sin lugar" : dayMonth}</span>
+                  </button>
                 );
               })}
             </div>
 
-            {/* Leyenda */}
-            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 8 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.78rem", color: theme.gray400 }}>
-                <div style={{ width: 12, height: 12, borderRadius: 3, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }} /> Disponible
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.78rem", color: theme.gray400 }}>
-                <div style={{ width: 12, height: 12, borderRadius: 3, background: "rgba(235,136,0,0.15)", border: "2px solid rgba(235,136,0,0.6)" }} /> Seleccionado
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.78rem", color: theme.gray400 }}>
-                <div style={{ width: 12, height: 12, borderRadius: 3, background: "rgba(255,70,70,0.07)", border: "1px solid rgba(255,70,70,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <div style={{ width: 8, height: 1, background: "rgba(255,120,120,0.55)" }} />
-                </div> Sin cupo
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.78rem", color: theme.gray400 }}>
-                <div style={{ width: 12, height: 12, borderRadius: 3, background: "transparent", border: "1px solid transparent" }} /> No laborable
-              </div>
-            </div>
-
-            {selectedDate && (
-              <div style={{ padding: 14, background: "rgba(235,136,0,0.06)", borderRadius: 10, border: "1px solid rgba(235,136,0,0.15)", marginTop: 8 }}>
-                <p style={{ fontSize: "0.88rem", color: theme.gray200 }}>
-                  Fecha seleccionada: <strong style={{ color: theme.orange }}>
-                    {new Date(selectedDate + "T12:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" })}
-                  </strong>
-                </p>
-              </div>
+            {loadingDates && <p style={{ ...panel.muted, textAlign: "center" }}>Buscando días disponibles...</p>}
+            {daysShown < dayOptions.length && (
+              <button onClick={() => setDaysShown((n) => n + TURNO_DAYS_PER_PAGE)} style={panel.btnText}>Ver más días</button>
             )}
-          </div>
+            <p style={panel.muted}>El taller no atiende turnos normales miércoles, sábados ni domingos.</p>
+
+            {error && <p style={{ color: "#ff8a80", fontSize: "1rem", margin: 0 }}>{error}</p>}
+            <button onClick={handleStep2} style={panel.btnPrimary}>{selectedDate ? `Seguir con el ${selectedDayText}` : "Seguir"}</button>
+          </>
         )}
 
-        {/* Disclaimer general */}
-        <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, padding: "14px 16px", marginTop: 24 }}>
-          <p style={{ fontSize: "0.78rem", color: theme.gray400, lineHeight: 1.6, marginBottom: 6 }}>
-            <strong style={{ color: theme.gray300 }}>Política de turnos:</strong> Ausentarse sin cancelar con al menos 24 hs de anticipación cuenta como turno perdido.
-          </p>
-          <p style={{ fontSize: "0.78rem", color: "#ff8080", lineHeight: 1.6 }}>
-            Acumular <strong>2 turnos perdidos</strong> genera una <strong>penalidad económica</strong> según el reglamento vigente.
-          </p>
-        </div>
+        {/* ── Paso 3: revisar y confirmar ── */}
+        {step === 3 && (
+          <>
+            <h1 style={{ ...panel.h1, fontSize: "clamp(1.6rem, 7vw, 1.9rem)" }}>Revisa y confirma</h1>
 
-        {error && <p style={{ color: "#ff4444", fontSize: "0.85rem", marginTop: 16 }}>{error}</p>}
+            <div style={{ ...panel.card, display: "flex", flexDirection: "column", gap: 14 }}>
+              {[
+                { label: "Día", value: isUrgente ? "Hoy, a la brevedad posible" : capitalize(selectedDayText) },
+                { label: "Tipo de turno", value: isUrgente ? "Urgente" : "Normal" },
+                { label: "Motivo", value: descripcion.trim() },
+                ...(user.autoAsignado ? [{ label: "Vehículo", value: `${user.autoAsignado.model} · ${fmtPatente(user.autoAsignado.patente)}` }] : []),
+              ].map((row) => (
+                <div key={row.label}>
+                  <p style={{ fontSize: "0.88rem", color: theme.gray300, margin: 0 }}>{row.label}</p>
+                  <p style={{ fontSize: "1.1rem", fontWeight: 700, margin: 0, overflowWrap: "anywhere" }}>{row.value}</p>
+                </div>
+              ))}
+            </div>
 
-        {/* Botón enviar */}
-        <button
-          onClick={handleSubmit}
-          disabled={loading}
-          style={{ width: "100%", padding: 15, background: loading ? theme.gray600 : (isUrgente ? "#d32f2f" : theme.orange), color: theme.white, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: "0.95rem", border: "none", borderRadius: 12, cursor: loading ? "not-allowed" : "pointer", marginTop: 16 }}
-        >
-          {loading ? "Enviando..." : isUrgente ? "Confirmar turno urgente" : "Confirmar turno →"}
-        </button>
+            <div style={{ ...panel.card, background: "rgba(255,255,255,0.03)" }}>
+              <p style={{ ...panel.muted, marginBottom: 6 }}>
+                <strong style={{ color: theme.gray200 }}>Política de turnos:</strong> Ausentarse sin cancelar con al menos 24 hs de anticipación cuenta como turno perdido.
+              </p>
+              <p style={{ ...panel.muted, color: "#ff9d94" }}>
+                Acumular <strong>2 turnos perdidos</strong> genera una <strong>penalidad económica</strong> según el reglamento vigente.
+              </p>
+            </div>
+
+            {error && <p style={{ color: "#ff8a80", fontSize: "1rem", margin: 0 }}>{error}</p>}
+            <button
+              onClick={handleSubmit}
+              disabled={loading}
+              style={{ ...panel.btnPrimary, background: loading ? theme.gray600 : (isUrgente ? "#d32f2f" : theme.orange), color: loading || isUrgente ? theme.white : theme.black, cursor: loading ? "not-allowed" : "pointer" }}
+            >
+              {loading ? "Enviando..." : isUrgente ? "Confirmar turno urgente" : "Confirmar turno"}
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -3003,6 +3136,8 @@ function WhatsAppButton({ user }) {
   const phone = user ? WHATSAPP_DRIVERS : WHATSAPP_PUBLIC;
   const message = user ? "¡Hola! Soy conductor de KPCars y tengo una consulta." : "¡Hola! Me interesa alquilar un auto con KPCars.";
   const href = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+  // En el panel del conductor, en el celular hay una barra fija abajo: el botón sube para no taparla
+  const inPanel = useLocation().pathname.startsWith("/panel");
 
   return (
     <>
@@ -3015,6 +3150,7 @@ function WhatsAppButton({ user }) {
         }
         .wa-float:hover { transform: scale(1.08); }
         .wa-float { transition: transform 0.2s ease; }
+        @media (max-width: 767px) { .wa-in-panel { bottom: 96px !important; } }
       `}</style>
 
       <a
@@ -3022,7 +3158,7 @@ function WhatsAppButton({ user }) {
         target="_blank"
         rel="noopener noreferrer"
         aria-label="Escríbenos por WhatsApp"
-        className="wa-float"
+        className={inPanel ? "wa-float wa-in-panel" : "wa-float"}
         style={{
           position: "fixed",     // fijo respecto a la ventana, no a la página
           bottom: 24,
