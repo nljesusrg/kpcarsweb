@@ -17,6 +17,16 @@
 - Antes de trabajar, bajar lo último de GitHub (`git pull`). Se trabaja desde dos compus y las conversaciones con Claude no pasan de una a otra: lo que haya que recordar va en este archivo.
 - `npm run lint` (el revisor de código) tiene que quedar en cero errores.
 
+## Cómo está organizado el código (dentro de `src`)
+- `App.jsx`: las direcciones de la página y el manejo de la sesión del conductor.
+- `config.js`: datos que se cambian seguido (WhatsApp, precio semanal, dirección de la API y de Google Sheets, fotos de la flota).
+- `theme.js`: los colores. `routes.js`: la dirección y el título de cada sección.
+- `utils/`: ayudas para fechas, montos, patentes y turnos.
+- `components/`: piezas que se repiten (menú, pie de página, íconos, botones, botón de WhatsApp).
+- `pages/`: una por pantalla (inicio, flota, formulario, ingreso, cambio de contraseña, "próximamente", pedir turno).
+- `panel/`: el área del chofer (inicio, turnos, multas, mis datos).
+- Los estilos van escritos dentro de cada componente; no hay hojas de estilo aparte.
+
 ## Cómo se publica
 - Cada `git push` a la rama `main` publica el sitio real: GitHub arma la página y la deja en la rama `deploy`, y Hostinger la copia al dominio.
 - Por eso el trabajo a medio hacer va en otra rama, que no publica nada.
@@ -42,7 +52,7 @@
 - Se muestran en LISTA (tabla en pantallas grandes, renglones apilados en el celular), no en tarjetas. Pendientes arriba, pagadas plegadas abajo.
 
 **Qué falta**
-- Se publicó sin haber probado esto, así que es lo primero a revisar. Probar con un chofer real: confirmar un turno (paso 3), cancelar un turno y abrir un PDF de multa. Son acciones reales, Claude no las ejecutó.
+- Leonardo probó en el sitio real confirmar un turno, cancelarlo y abrir un PDF de multa el 4 de octubre de 2026: funcionan. Claude no ejecuta esas acciones porque son reales; después de cambios en el panel hay que pedirle a Leonardo que las repita.
 - Revisar la pantalla "Mis datos": es la de perfil anterior, sin rediseñar.
 - Decidir si el botón flotante de WhatsApp se oculta dentro del panel en el celular (hoy puede tapar parte de la lista de multas).
 - Decidir qué etiqueta llevan los turnos de fechas pasadas que el sistema sigue marcando "Agendado".
