@@ -1,17 +1,19 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { theme } from "../theme.js";
-import { pad2, localDateStr, capitalize, fmtPatente } from "../utils/format.js";
+import { pad2, localDateStr, capitalize, dayLabel, fmtPatente } from "../utils/format.js";
 import { AlertIcon, ChevronIcon } from "../components/Icons.jsx";
 import { panel } from "../panel/panelStyles.js";
 
 /* Pedir turno, paso a paso: 1) qué le pasa al auto  2) qué día  3) revisar y confirmar.
-   Un turno urgente no elige día: pasa directo del paso 1 al 3. */
+   En el paso 2, un turno normal elige entre los próximos días con lugar;
+   un turno urgente solo puede elegir hoy (hasta las 18 hs) o el día hábil siguiente. */
 const TURNO_DAYS_AHEAD = 60;   // hasta cuántos días para adelante se puede pedir
 
 const TURNO_DAYS_PER_PAGE = 6; // cuántos días se muestran de entrada (y con cada "Ver más días")
 
 const TURNO_MAX_PER_DAY = 4;   // con esta cantidad de turnos normales, el día queda sin lugar
+const URGENTE_HORA_LIMITE = 18; // desde esta hora ya no se dan turnos urgentes para el mismo día
 
 export function TurnosPage({ user, apiFetch }) {
   const routerNavigate = useNavigate();
@@ -68,12 +70,26 @@ export function TurnosPage({ user, apiFetch }) {
     dayOptions.push({ dateStr, full: fullDates.includes(dateStr) });
   }
 
+  // Turno urgente: hoy (si es día hábil y todavía no son las 18) o el día hábil siguiente.
+  // Los urgentes no se atienden sábados ni domingos; los miércoles sí.
+  const isWeekend = (d) => d.getDay() === 0 || d.getDay() === 6;
+  const now = new Date();
+  const todayOpen = !isWeekend(now) && now.getHours() < URGENTE_HORA_LIMITE;
+  const nextWorkday = new Date();
+  do { nextWorkday.setDate(nextWorkday.getDate() + 1); } while (isWeekend(nextWorkday));
+  const urgentOptions = [...(todayOpen ? [localDateStr(now)] : []), localDateStr(nextWorkday)];
+  // "Hoy" / "Mañana" / "Lunes" según qué tan cerca esté el día
+  const shortDayName = (dateStr) => {
+    const label = dayLabel(dateStr);
+    return label === "Hoy" || label === "Mañana" ? label : capitalize(new Date(dateStr + "T12:00:00").toLocaleDateString("es-AR", { weekday: "long" }));
+  };
+
   const handleStep1 = () => {
     if (!descripcion.trim()) { setError("Cuéntanos qué le pasa al auto o el motivo de la revisión."); return; }
     if (!urgencia) { setError("Elige si es un turno normal o urgente."); return; }
     setError("");
-    if (isUrgente) { setSelectedDate(null); setStep(3); }
-    else { setStep(2); loadFullDates(); }
+    setStep(2);
+    if (!isUrgente) loadFullDates();
     window.scrollTo({ top: 0 });
   };
 
@@ -87,7 +103,6 @@ export function TurnosPage({ user, apiFetch }) {
   const handleBack = () => {
     setError("");
     if (step === 1) goToPanelTurnos();
-    else if (step === 3 && isUrgente) setStep(1);
     else setStep(step - 1);
   };
 
@@ -100,8 +115,15 @@ export function TurnosPage({ user, apiFetch }) {
       setError("Selecciona el nivel de urgencia.");
       return;
     }
-    if (!isUrgente && !selectedDate) {
+    if (!selectedDate) {
       setError("Selecciona un día para el turno.");
+      return;
+    }
+    // Por si la pantalla quedó abierta y mientras tanto se hicieron las 18 o cambió el día
+    if (isUrgente && !urgentOptions.includes(selectedDate)) {
+      setSelectedDate(null);
+      setStep(2);
+      setError("Ese día ya no está disponible para un turno urgente. Elige otro.");
       return;
     }
     setError("");
@@ -112,7 +134,7 @@ export function TurnosPage({ user, apiFetch }) {
         method: "POST",
         body: JSON.stringify({
           service: descripcion,
-          preferred_date: isUrgente ? localDateStr() : selectedDate,
+          preferred_date: selectedDate,
           type: isUrgente ? "emergencia" : "normal",
         }),
       });
@@ -138,6 +160,8 @@ export function TurnosPage({ user, apiFetch }) {
   const inputStyle = { width: "100%", padding: "14px 16px", background: theme.gray800, border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12, color: theme.white, fontFamily: "'DM Sans', sans-serif", fontSize: "1.05rem", outline: "none", boxSizing: "border-box" };
   // "martes 6 de octubre"
   const selectedDayText = selectedDate ? new Date(selectedDate + "T12:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" }) : "";
+  // "hoy, lunes 5 de octubre" / "mañana, martes 6 de octubre" / "el lunes 12 de octubre"
+  const urgentDayText = !selectedDate ? "" : ["Hoy", "Mañana"].includes(dayLabel(selectedDate)) ? `${dayLabel(selectedDate).toLowerCase()}, ${selectedDayText}` : `el ${selectedDayText}`;
 
   if (confirmed) {
     return (
@@ -147,8 +171,8 @@ export function TurnosPage({ user, apiFetch }) {
           <h1 style={{ ...panel.h1, fontSize: "1.8rem", marginBottom: 12 }}>{isUrgente ? "Turno urgente confirmado" : "Turno confirmado"}</h1>
           {isUrgente ? (
             <>
-              <p style={{ ...panel.muted, fontSize: "1.05rem" }}>Tu turno de emergencia quedó registrado. El taller fue notificado y te atenderán</p>
-              <p style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.4rem", color: "#ff8a80", margin: "6px 0 0" }}>a la brevedad posible.</p>
+              <p style={{ ...panel.muted, fontSize: "1.05rem" }}>Tu turno de emergencia quedó registrado y el taller fue notificado. Te esperan</p>
+              <p style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: "1.4rem", color: "#ff8a80", margin: "6px 0 0" }}>{urgentDayText}.</p>
               <p style={{ ...panel.muted, marginTop: 16 }}>Preséntate en el taller con el vehículo. Si no puedes asistir, cancela con anticipación para evitar penalidades.</p>
             </>
           ) : (
@@ -212,11 +236,11 @@ export function TurnosPage({ user, apiFetch }) {
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {[
                   { value: "normal", label: "No, es un turno normal", desc: "Revisión de rutina, service o problema menor. Eliges el día en el paso siguiente.", color: theme.orange, bgColor: "rgba(235,136,0,0.1)" },
-                  { value: "urgente", label: "Sí, es urgente", desc: "El vehículo tiene una falla grave que te impide trabajar hoy. Solo usa esta opción si realmente no puedes circular.", color: "#ff8a80", bgColor: "rgba(255,82,82,0.1)" },
+                  { value: "urgente", label: "Sí, es urgente", desc: "El vehículo tiene una falla grave que te impide trabajar. Solo usa esta opción si realmente no puedes circular.", color: "#ff8a80", bgColor: "rgba(255,82,82,0.1)" },
                 ].map((opt) => (
                   <button
                     key={opt.value}
-                    onClick={() => { setUrgencia(opt.value); if (opt.value === "urgente") setSelectedDate(null); }}
+                    onClick={() => { if (opt.value !== urgencia) setSelectedDate(null); setUrgencia(opt.value); }}
                     aria-pressed={urgencia === opt.value}
                     style={{
                       display: "flex", alignItems: "flex-start", gap: 12, padding: 16,
@@ -257,7 +281,48 @@ export function TurnosPage({ user, apiFetch }) {
         )}
 
         {/* ── Paso 2: qué día ── */}
-        {step === 2 && (
+        {step === 2 && isUrgente && (
+          <>
+            <h1 style={{ ...panel.h1, fontSize: "clamp(1.6rem, 7vw, 1.9rem)" }}>¿Qué día vas al taller?</h1>
+
+            <div style={{ display: "grid", gridTemplateColumns: urgentOptions.length > 1 ? "1fr 1fr" : "1fr", gap: 10 }}>
+              {urgentOptions.map((dateStr) => {
+                const selected = selectedDate === dateStr;
+                const date = new Date(dateStr + "T12:00:00");
+                return (
+                  <button
+                    key={dateStr}
+                    onClick={() => { setSelectedDate(dateStr); setError(""); }}
+                    aria-pressed={selected}
+                    style={{
+                      minHeight: 92, borderRadius: 14, fontFamily: "'DM Sans', sans-serif", cursor: "pointer",
+                      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
+                      background: selected ? "#d32f2f" : theme.gray900,
+                      border: selected ? "1px solid #d32f2f" : "1px solid rgba(255,255,255,0.2)",
+                      color: theme.white,
+                    }}
+                  >
+                    <span style={{ fontSize: "1.3rem", fontWeight: 700 }}>{shortDayName(dateStr)}</span>
+                    <span style={{ fontSize: "0.95rem", color: selected ? theme.white : theme.gray300 }}>{date.toLocaleDateString("es-AR", { day: "numeric", month: "long" })}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <p style={panel.muted}>
+              {todayOpen
+                ? "Un turno urgente se puede pedir para hoy o para el día hábil siguiente."
+                : isWeekend(now)
+                  ? "Los turnos urgentes se atienden de lunes a viernes."
+                  : `Después de las ${URGENTE_HORA_LIMITE} hs ya no se dan turnos urgentes para el mismo día.`}
+            </p>
+
+            {error && <p style={{ color: "#ff8a80", fontSize: "1rem", margin: 0 }}>{error}</p>}
+            <button onClick={handleStep2} style={panel.btnPrimary}>{selectedDate ? `Seguir con ${urgentDayText}` : "Seguir"}</button>
+          </>
+        )}
+
+        {step === 2 && !isUrgente && (
           <>
             <h1 style={{ ...panel.h1, fontSize: "clamp(1.6rem, 7vw, 1.9rem)" }}>¿Qué día te queda bien?</h1>
 
@@ -307,7 +372,7 @@ export function TurnosPage({ user, apiFetch }) {
 
             <div style={{ ...panel.card, display: "flex", flexDirection: "column", gap: 14 }}>
               {[
-                { label: "Día", value: isUrgente ? "Hoy, a la brevedad posible" : capitalize(selectedDayText) },
+                { label: "Día", value: capitalize(isUrgente ? urgentDayText : selectedDayText) },
                 { label: "Tipo de turno", value: isUrgente ? "Urgente" : "Normal" },
                 { label: "Motivo", value: descripcion.trim() },
                 ...(user.autoAsignado ? [{ label: "Vehículo", value: `${user.autoAsignado.model} · ${fmtPatente(user.autoAsignado.patente)}` }] : []),

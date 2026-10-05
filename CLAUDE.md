@@ -39,7 +39,8 @@
 - Los choferes entran 100% desde el celular y lo que más consultan son los turnos. El panel se piensa primero para celular, con letra grande.
 - Pero también tiene que verse bien en pantallas grandes: ahí las secciones van como pestañas arriba a la derecha del saludo (como era antes), con el botón "Pedir turno", y el contenido usa el ancho.
 - Secciones del panel: Inicio (`/panel/inicio`, es donde se entra), Turnos, Multas y Mis datos. En el celular van en una barra fija abajo.
-- Pedir turno (`/turnos`) es en 3 pasos: qué le pasa al auto, qué día, revisar y confirmar. El urgente salta el paso del día. Las reglas no cambiaron: sin turnos normales miércoles, sábados ni domingos; un día con 4 turnos normales queda "Sin lugar"; se ofrecen hasta 60 días para adelante.
+- Pedir turno (`/turnos`) es en 3 pasos: qué le pasa al auto, qué día, revisar y confirmar. Reglas del turno normal: sin miércoles, sábados ni domingos; un día con 4 turnos normales queda "Sin lugar"; se ofrecen hasta 60 días para adelante.
+- Turno urgente (decidido por Leonardo el 5 de octubre de 2026): en el paso 2 solo se puede elegir hoy o el día hábil siguiente. No se atienden sábados ni domingos (los miércoles sí). Desde las 18 hs ya no se ofrece "hoy". Si el día siguiente cae en fin de semana, se ofrece el lunes. El sistema acepta una emergencia con fecha del día siguiente.
 - Los textos de la página van de "tú" ("Tienes", "Debes"), como el resto del sitio.
 - Maqueta de referencia (privada, de la cuenta de Leonardo): https://claude.ai/artifact/UHbmVbMntYFq98wkpmN9C1
 
