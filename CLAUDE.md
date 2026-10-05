@@ -33,7 +33,7 @@
 - Pendiente menor: actualizar `actions/checkout@v4` y `actions/setup-node@v4` en `.github/workflows/deploy.yml` (GitHub avisa que quedan viejas).
 
 ## Área del chofer: rediseño (octubre 2026)
-**Dónde está:** en `main` y publicado en el sitio real desde el 3 de octubre de 2026, por pedido de Leonardo. La rama `rediseno-area-chofer` quedó igual que `main` y ya no hace falta.
+**Dónde está:** en `main` y publicado en el sitio real desde el 3 de octubre de 2026, por pedido de Leonardo. El código ordenado en archivos y la nueva regla del turno urgente se publicaron el 5 de octubre de 2026. Las ramas `rediseno-area-chofer` y `ordenar-codigo` quedaron iguales o atrás de `main` y ya no hacen falta.
 
 **Qué se decidió**
 - Los choferes entran 100% desde el celular y lo que más consultan son los turnos. El panel se piensa primero para celular, con letra grande.
