@@ -27,13 +27,17 @@
 - `panel/`: el área del chofer (inicio, turnos, multas, mis datos).
 - Los estilos van escritos dentro de cada componente; no hay hojas de estilo aparte.
 
+## Dónde están las tareas
+- En Linear, proyecto "KPCars Web" (las tareas se llaman KPW-número). Ahí está lo hecho, lo pendiente y lo que salió de la revisión completa del 4 de octubre de 2026.
+- Al terminar algo, actualizar la tarea en Linear y, si cambia una decisión o una regla, anotarlo también acá.
+
 ## Cómo se publica
 - Cada `git push` a la rama `main` publica el sitio real: GitHub arma la página y la deja en la rama `deploy`, y Hostinger la copia al dominio.
 - Por eso el trabajo a medio hacer va en otra rama, que no publica nada.
 - Pendiente menor: actualizar `actions/checkout@v4` y `actions/setup-node@v4` en `.github/workflows/deploy.yml` (GitHub avisa que quedan viejas).
 
 ## Área del chofer: rediseño (octubre 2026)
-**Dónde está:** en `main` y publicado en el sitio real desde el 3 de octubre de 2026, por pedido de Leonardo. El código ordenado en archivos y la nueva regla del turno urgente se publicaron el 5 de octubre de 2026. Las ramas `rediseno-area-chofer` y `ordenar-codigo` quedaron iguales o atrás de `main` y ya no hacen falta.
+**Dónde está:** en `main` y publicado en el sitio real desde el 3 de octubre de 2026, por pedido de Leonardo. El código ordenado en archivos y la nueva regla del turno urgente se publicaron el 5 de octubre de 2026. Todo está en `main`; no quedan ramas de trabajo abiertas.
 
 **Qué se decidió**
 - Los choferes entran 100% desde el celular y lo que más consultan son los turnos. El panel se piensa primero para celular, con letra grande.
@@ -53,6 +57,7 @@
 - Se muestran en LISTA (tabla en pantallas grandes, renglones apilados en el celular), no en tarjetas. Pendientes arriba, pagadas plegadas abajo.
 
 **Qué falta**
+- Lo publicado el 5 de octubre de 2026 salió sin prueba previa: falta que Leonardo recorra el panel en el sitio real, pida un turno urgente de prueba para el día siguiente y pruebe ampliar la foto de perfil en "Mis datos".
 - Leonardo probó en el sitio real confirmar un turno, cancelarlo y abrir un PDF de multa el 4 de octubre de 2026: funcionan. Claude no ejecuta esas acciones porque son reales; después de cambios en el panel hay que pedirle a Leonardo que las repita.
 - Revisar la pantalla "Mis datos": es la de perfil anterior, sin rediseñar.
 - Decidir si el botón flotante de WhatsApp se oculta dentro del panel en el celular (hoy puede tapar parte de la lista de multas).
