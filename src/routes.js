@@ -32,7 +32,23 @@ export const pageTitles = {
   turnos: "Solicitar turno — KPCars",
   fletes: "KPCars Fletes — Próximamente",
   auxilios: "KPCars Auxilios — Próximamente",
+  "not-found": "Página no encontrada — KPCars",
 };
+
+/* Descripción de cada sección: es el texto que Google muestra debajo del título */
+const DEFAULT_DESCRIPTION = "Alquila un Toyota y trabaja en Uber, Didi, Cabify o particular. Flota 100% Toyota con taller propio, papeles al día y alquiler semanal en Buenos Aires.";
+export const pageDescriptions = {
+  home: DEFAULT_DESCRIPTION,
+  catalog: "Conoce la flota de KPCars: Toyota Corolla 2015 en adelante, automáticos y manuales, con GNC y aire acondicionado. Alquiler semanal en Buenos Aires.",
+  apply: "Completa el formulario para manejar con KPCars. Te contactamos para coordinar una entrevista y la entrega del auto.",
+  login: "Zona Conductores de KPCars: ingresa con tu DNI para ver tus turnos, tus multas y tus datos.",
+  fletes: "KPCars Fletes llega próximamente. Mientras tanto, consúltanos por WhatsApp.",
+  auxilios: "KPCars Auxilios llega próximamente. Mientras tanto, consúltanos por WhatsApp.",
+};
+export const getPageDescription = (page) => pageDescriptions[page] || DEFAULT_DESCRIPTION;
+
+/* Secciones que no deben aparecer en buscadores: las privadas y la de "no encontrada" */
+export const noIndexPages = ["dashboard", "turnos", "change-password", "not-found"];
 
 /* Áreas de KPCars. Rentals es la principal (es el inicio); las demás están en preparación. */
 export const areas = [

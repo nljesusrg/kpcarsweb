@@ -41,6 +41,9 @@
 ## Cómo se publica
 - Cada `git push` a la rama `main` publica el sitio real: GitHub arma la página y la deja en la rama `deploy`, y Hostinger la copia al dominio.
 - Por eso el trabajo a medio hacer va en otra rama, que no publica nada.
+- La dirección oficial es `https://kpcars.com.ar`, sin `www` (decisión de Leonardo). `www` redirige sola; está en `public/.htaccess`.
+- Para Google: `public/robots.txt` excluye las páginas privadas y `public/sitemap.xml` lista las públicas. Si se agrega una sección pública nueva, sumarla al `sitemap.xml` y ponerle título y descripción en `src/routes.js`.
+- Una dirección que no existe muestra la página "no encontrada" (`src/pages/NotFoundPage.jsx`).
 - Pendiente menor: actualizar `actions/checkout@v4` y `actions/setup-node@v4` en `.github/workflows/deploy.yml` (GitHub avisa que quedan viejas).
 
 ## Área del chofer: rediseño (octubre 2026)

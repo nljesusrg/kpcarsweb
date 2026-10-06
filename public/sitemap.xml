@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Páginas públicas del sitio. Si se agrega una sección pública nueva, sumarla acá. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://kpcars.com.ar/</loc></url>
+  <url><loc>https://kpcars.com.ar/flota</loc></url>
+  <url><loc>https://kpcars.com.ar/quiero-manejar</loc></url>
+  <url><loc>https://kpcars.com.ar/conductores</loc></url>
+</urlset>

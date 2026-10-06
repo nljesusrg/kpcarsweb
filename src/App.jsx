@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router";
 import { API_BASE, SITE_URL } from "./config.js";
 import { theme } from "./theme.js";
-import { pagePaths, pathPages, pageTitles, areas } from "./routes.js";
+import { pagePaths, pathPages, pageTitles, getPageDescription, noIndexPages, areas } from "./routes.js";
 import { toAbsoluteUrl } from "./utils/format.js";
 import { Nav } from "./components/Nav.jsx";
 import { Footer } from "./components/Footer.jsx";
@@ -14,6 +14,7 @@ import { ApplyPage } from "./pages/ApplyPage.jsx";
 import { LoginPage } from "./pages/LoginPage.jsx";
 import { ChangePasswordPage } from "./pages/ChangePasswordPage.jsx";
 import { TurnosPage } from "./pages/TurnosPage.jsx";
+import { NotFoundPage } from "./pages/NotFoundPage.jsx";
 import { DashboardPage } from "./panel/DashboardPage.jsx";
 
 export default function KPCarsApp() {
@@ -21,7 +22,7 @@ export default function KPCarsApp() {
   const routerNavigate = useNavigate();
   // "/flota/" y "/flota" son la misma sección
   const currentPath = location.pathname.replace(/\/+$/, "") || "/";
-  const page = pathPages[currentPath] || "home";
+  const page = pathPages[currentPath] || "not-found";
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [user, setUser] = useState(() => {
@@ -31,7 +32,21 @@ export default function KPCarsApp() {
 
   // Cada vez que cambia la dirección (también con el botón "Atrás"): título y scroll arriba
   useEffect(() => {
-    document.title = pageTitles[pathPages[currentPath]] || "KPCars";
+    document.title = pageTitles[page] || "KPCars";
+    // Descripción propia de la sección (el texto que Google muestra debajo del título)
+    document.querySelector('meta[name="description"]')?.setAttribute("content", getPageDescription(page));
+    // Las secciones privadas y la de "no encontrada" piden no aparecer en buscadores
+    let robots = document.querySelector('meta[name="robots"]');
+    if (noIndexPages.includes(page)) {
+      if (!robots) {
+        robots = document.createElement("meta");
+        robots.name = "robots";
+        document.head.appendChild(robots);
+      }
+      robots.content = "noindex";
+    } else {
+      robots?.remove();
+    }
     // Le dice a Google cuál es la dirección oficial de esta sección (siempre sin www)
     let canonical = document.querySelector('link[rel="canonical"]');
     if (!canonical) {
@@ -41,7 +56,7 @@ export default function KPCarsApp() {
     }
     canonical.href = SITE_URL + (currentPath === "/" ? "/" : currentPath);
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }, [currentPath]);
+  }, [currentPath, page]);
 
   // Las secciones con clase "reveal" aparecen suavemente al llegar a ellas.
   // Solo se ocultan las que están debajo de la pantalla; si algo falla, quedan visibles.
@@ -343,8 +358,8 @@ export default function KPCarsApp() {
         {areas.filter((a) => a.soon).map((a) => (
           <Route key={a.key} path={pagePaths[a.page]} element={<ComingSoonPage area={a} navigate={navigate} />} />
         ))}
-        {/* Dirección desconocida: al inicio (la página 404 llega en la Etapa 3) */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* Dirección desconocida: página de "no encontrada" */}
+        <Route path="*" element={<NotFoundPage navigate={navigate} />} />
       </Routes>
 
       {!["dashboard", "turnos", "change-password"].includes(page) && <Footer navigate={navigate} user={user} />}
