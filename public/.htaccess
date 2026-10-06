@@ -1,5 +1,11 @@
 Options -MultiViews
 RewriteEngine On
+
+# Una sola dirección oficial: www.kpcars.com.ar redirige a kpcars.com.ar
+RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
+RewriteRule ^ https://%1%{REQUEST_URI} [R=301,L]
+
+# Las direcciones tipo /flota las resuelve la página (index.html)
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^ index.html [QSA,L]

@@ -11,6 +11,9 @@ export const GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycby9oZ4h
 // Ejemplo: "https://script.google.com/macros/s/AKfycbx.../exec"
 
 /* ─── API CONFIG ─── */
+// Dirección oficial del sitio (sin www)
+export const SITE_URL = "https://kpcars.com.ar";
+
 export const API_BASE = "https://kpcars.online/api";
 
 // WhatsApp en formato internacional, sin espacios ni símbolos (lo usa wa.me)

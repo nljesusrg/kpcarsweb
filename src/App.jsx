@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router";
-import { API_BASE } from "./config.js";
+import { API_BASE, SITE_URL } from "./config.js";
 import { theme } from "./theme.js";
 import { pagePaths, pathPages, pageTitles, areas } from "./routes.js";
 import { toAbsoluteUrl } from "./utils/format.js";
@@ -32,6 +32,14 @@ export default function KPCarsApp() {
   // Cada vez que cambia la dirección (también con el botón "Atrás"): título y scroll arriba
   useEffect(() => {
     document.title = pageTitles[pathPages[currentPath]] || "KPCars";
+    // Le dice a Google cuál es la dirección oficial de esta sección (siempre sin www)
+    let canonical = document.querySelector('link[rel="canonical"]');
+    if (!canonical) {
+      canonical = document.createElement("link");
+      canonical.rel = "canonical";
+      document.head.appendChild(canonical);
+    }
+    canonical.href = SITE_URL + (currentPath === "/" ? "/" : currentPath);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [currentPath]);
 
