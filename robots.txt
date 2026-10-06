@@ -1,0 +1,7 @@
+# Las paginas privadas de los conductores no se muestran en buscadores
+User-agent: *
+Disallow: /panel
+Disallow: /turnos
+Disallow: /cambiar-contrasena
+
+Sitemap: https://kpcars.com.ar/sitemap.xml

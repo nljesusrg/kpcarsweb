@@ -1,0 +1,26 @@
+Options -MultiViews
+RewriteEngine On
+
+# Una sola dirección oficial: www.kpcars.com.ar redirige a kpcars.com.ar
+RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
+RewriteRule ^ https://%1%{REQUEST_URI} [R=301,L]
+
+# Las direcciones tipo /flota las resuelve la página (index.html)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.html [QSA,L]
+
+AddType application/javascript .js
+AddType text/css .css
+AddType image/svg+xml .svg
+AddType image/png .png
+AddType image/jpeg .jpg
+
+<IfModule mod_headers.c>
+  <FilesMatch "\.(js|css|png|jpg|svg|woff2?)$">
+    Header set Cache-Control "max-age=31536000, public"
+  </FilesMatch>
+  <FilesMatch "index\.html$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+  </FilesMatch>
+</IfModule>
