@@ -66,10 +66,12 @@
 - Si hay pago parcial, se muestra lo que falta y debajo "Pagaste $X de $Y".
 - Se muestran en LISTA (tabla en pantallas grandes, renglones apilados en el celular), no en tarjetas. Pendientes arriba, pagadas plegadas abajo.
 
+**Decisiones de Leonardo del 6 de octubre de 2026**
+- El botón flotante de WhatsApp se queda dentro del panel, también en el celular: tiene que ser fácil para el chofer comunicarse.
+- Un turno de una fecha pasada que el sistema sigue marcando "agendado" se le muestra al chofer como "Perdido", con un enlace "¿No fue así? Escríbenos" a la central. Es solo cómo se muestra: no cambia nada en el sistema.
+- Los días "Sin lugar" al pedir turno son correctos: reflejan que no hay lugar en el sistema de turnos.
+- Leonardo probó en el sitio real el panel, el turno urgente y la foto ampliada: funcionan.
+
 **Qué falta**
-- Lo publicado el 5 de octubre de 2026 salió sin prueba previa: falta que Leonardo recorra el panel en el sitio real, pida un turno urgente de prueba para el día siguiente y pruebe ampliar la foto de perfil en "Mis datos".
-- Leonardo probó en el sitio real confirmar un turno, cancelarlo y abrir un PDF de multa el 4 de octubre de 2026: funcionan. Claude no ejecuta esas acciones porque son reales; después de cambios en el panel hay que pedirle a Leonardo que las repita.
-- Revisar la pantalla "Mis datos": es la de perfil anterior, sin rediseñar.
-- Decidir si el botón flotante de WhatsApp se oculta dentro del panel en el celular (hoy puede tapar parte de la lista de multas).
-- Decidir qué etiqueta llevan los turnos de fechas pasadas que el sistema sigue marcando "Agendado".
-- Confirmar que los días "Sin lugar" que muestra el paso 2 coinciden con la realidad del taller.
+- Rediseñar la pantalla "Mis datos" (es la de perfil anterior). Va en una sesión aparte, con maqueta previa.
+- Verificar que la fecha "Lo usas desde" del auto coincida con la fecha real de entrega (podría mostrarse un día antes).

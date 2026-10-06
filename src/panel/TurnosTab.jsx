@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { theme } from "../theme.js";
 import { capitalize, dayLabel, fmtPatente } from "../utils/format.js";
-import { turnoDay, isTurnoProximo, fetchAllTurnos, turnoStatus } from "../utils/turnos.js";
+import { driverWhatsAppHref } from "../config.js";
+import { turnoDay, isTurnoProximo, fetchAllTurnos, turnoStatus, turnoDisplayStatus } from "../utils/turnos.js";
 import { PlusIcon } from "../components/Icons.jsx";
 import { panel } from "./panelStyles.js";
 
@@ -133,12 +134,23 @@ export function TurnosTab({ apiFetch, navigate }) {
         <section style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <h2 style={panel.h2}>Anteriores</h2>
           {anterioresVisibles.map((t) => {
-            const s = turnoStatus[t.status] || turnoStatus.agendado;
+            const estado = turnoDisplayStatus(t);
+            const s = turnoStatus[estado] || turnoStatus.agendado;
             return (
               <div key={t.id} style={{ ...panel.card, padding: "14px 16px", borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                 <div style={{ minWidth: 0, flex: "1 1 180px" }}>
                   <p style={{ fontSize: "1rem", fontWeight: 700, margin: 0 }}>{fechaConAnio(turnoDay(t))}</p>
                   <p style={panel.muted}>{t.service}</p>
+                  {estado === "perdido" && (
+                    <a
+                      href={driverWhatsAppHref(`¡Hola! Soy conductor de KPCars. Mi turno del ${fechaConAnio(turnoDay(t)).toLowerCase()} figura como perdido y quiero revisarlo.`)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ display: "inline-flex", alignItems: "center", minHeight: 44, color: theme.orange, fontSize: "0.95rem", fontWeight: 700, textDecoration: "none" }}
+                    >
+                      ¿No fue así? Escríbenos
+                    </a>
+                  )}
                 </div>
                 <span style={panel.chip(s.color, s.bg)}>{s.label}</span>
               </div>

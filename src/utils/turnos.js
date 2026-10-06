@@ -26,4 +26,10 @@ export const turnoStatus = {
   en_proceso: { label: "En proceso", color: "#7fd0ff",     bg: "rgba(41,182,246,0.14)" },
   completado: { label: "Completado", color: "#8fd9a8",     bg: "rgba(76,175,80,0.14)" },
   cancelado:  { label: "Cancelado",  color: theme.gray200, bg: "rgba(255,255,255,0.08)" },
+  perdido:    { label: "Perdido",    color: "#ff9d94",     bg: "rgba(255,82,82,0.16)" },
 };
+
+// Estado que se le muestra al conductor. Un turno de una fecha que ya pasó y que el sistema
+// sigue marcando "agendado" se muestra como "perdido" (decisión de Leonardo): así el conductor
+// lo ve y, si no fue así, puede avisar para que se corrija.
+export const turnoDisplayStatus = (t) => (t.status === "agendado" && turnoDay(t) && turnoDay(t) < localDateStr() ? "perdido" : t.status);
