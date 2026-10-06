@@ -8,13 +8,13 @@ import kpLogo from "../assets/kpcars-logo-blanco.png";
 
 export function HomePage({ navigate, user }) {
   const stats = [
-    { icon: <CarIcon size={20} opacity={1} />, title: "100% Toyota", label: "Corolla y Etios" },
+    { icon: <CarIcon size={20} opacity={1} />, title: "100% Toyota", label: "Corolla 2015 en adelante" },
     { icon: <WrenchIcon size={20} />, title: "Taller propio", label: "Service y mantenimiento" },
     { icon: <CoinIcon size={20} />, title: "Pago semanal", label: "Fijo, sin sorpresas" },
   ];
 
   const features = [
-    { icon: <CarIcon size={22} opacity={1} />, title: "Flota 100% Toyota", desc: "Corolla y Etios modelos 2016–2019: vehículos confiables, económicos y con respaldo de la marca más vendida de Argentina." },
+    { icon: <CarIcon size={22} opacity={1} />, title: "Flota 100% Toyota", desc: "Toyota Corolla modelo 2015 en adelante: vehículos confiables, económicos y con respaldo de la marca más vendida de Argentina." },
     { icon: <DocumentIcon size={22} />, title: "Papeles al día", desc: "Seguro, VTV, y toda la documentación necesaria para que manejes tranquilo y sin preocupaciones legales." },
     { icon: <WrenchIcon size={22} />, title: "Taller propio", desc: "Contamos con taller propio donde hacemos todo tipo de mantenimiento y service. No dependes de terceros." },
     { icon: <CoinIcon size={22} />, title: "Alquiler semanal", desc: "Pago semanal fijo. Sabes exactamente cuánto pagas cada semana, sin sorpresas ni costos ocultos." },
