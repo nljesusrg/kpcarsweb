@@ -27,6 +27,13 @@
 - `panel/`: el área del chofer (inicio, turnos, multas, mis datos).
 - Los estilos van escritos dentro de cada componente; no hay hojas de estilo aparte.
 
+## Formulario "Quiero manejar" y Google Sheets
+- El formulario le envía los datos a un script de Google (Apps Script) que los guarda en una planilla. El script contesta `{ success: true }` o `{ success: false, error }`, y la página muestra "¡Solicitud enviada!" solo si recibe `success: true`.
+- **No tocar el script de Google.** Decisión de Leonardo (6 de octubre de 2026): le costó mucho hacerlo funcionar. Cualquier mejora se hace del lado de la página. Si alguna vez hiciera falta cambiarlo, preguntarle antes y explicarle cómo volver atrás.
+- Los nombres de los datos que se envían (`nombre`, `nacimiento`, `direccion`, `localidad`, `telefono`, `email`, `licencia`, `vigencia`, `urgencia`, `apps`, `alquilerPrevio`, `empresaAnterior`, `referencia`, `comentario`) los usa el script para armar las columnas: no se cambian.
+- La página tiene dos trampas contra envíos automáticos: un casillero invisible y un mínimo de 5 segundos. No frenan a quien le escriba directo al script; si aparecen filas basura en la planilla, es por ahí.
+- Probar un envío real crea una fila en la planilla real, aunque se haga desde la compu.
+
 ## Dónde están las tareas
 - En Linear, proyecto "KPCars Web" (las tareas se llaman KPW-número). Ahí está lo hecho, lo pendiente y lo que salió de la revisión completa del 4 de octubre de 2026.
 - Al terminar algo, actualizar la tarea en Linear y, si cambia una decisión o una regla, anotarlo también acá.

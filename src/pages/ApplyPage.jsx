@@ -1,7 +1,10 @@
-import { useState, useRef } from "react";
-import { GOOGLE_SHEET_URL } from "../config.js";
+import { useState, useEffect, useRef } from "react";
+import { GOOGLE_SHEET_URL, WHATSAPP_PUBLIC } from "../config.js";
 import { theme } from "../theme.js";
 import { SectionLabel, SectionTitle, FormSection, FormGroup, FormRow } from "../components/ui.jsx";
+
+// Nadie completa el formulario en menos de estos segundos: si llega antes, es un envío automático
+const MIN_SEGUNDOS = 5;
 
 export function ApplyPage() {
   const [submitted, setSubmitted] = useState(false);
@@ -28,6 +31,14 @@ export function ApplyPage() {
     setShowEmpresa(v === "Sí, a una empresa" || v === "Sí, a un particular");
   };
 
+  // Dos trampas para envíos automáticos, que una persona no nota:
+  // un casillero invisible (los programas lo completan) y el tiempo que se tardó en llenar el formulario.
+  const sitioRef = useRef();
+  const startedAt = useRef(0);
+  useEffect(() => { startedAt.current = Date.now(); }, []);
+  // true cuando el envío falló: se ofrece escribir por WhatsApp
+  const [sendFailed, setSendFailed] = useState(false);
+
   const handleSubmit = async () => {
     // Mismos nombres y mismo orden que antes: los usa el script de Google Sheets
     const refs = {
@@ -49,6 +60,15 @@ export function ApplyPage() {
     }
 
     setError("");
+    setSendFailed(false);
+
+    // Si cayó en una trampa, se le muestra "enviada" pero no se manda nada
+    const segundos = Math.round((Date.now() - startedAt.current) / 1000);
+    if (sitioRef.current?.value || segundos < MIN_SEGUNDOS) {
+      setSubmitted(true);
+      return;
+    }
+
     setLoading(true);
 
     const appsChecked = [...document.querySelectorAll(".app-check:checked")].map((c) => c.value);
@@ -60,19 +80,27 @@ export function ApplyPage() {
       comentario: v.comentario || "—",
     };
 
+    // Solo se muestra "¡Solicitud enviada!" si la planilla contesta que la guardó.
+    // Se envía como texto plano para que el navegador pueda leer la respuesta de Google.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 25000);
     try {
-      if (GOOGLE_SHEET_URL) {
-        await fetch(GOOGLE_SHEET_URL, {
-          method: "POST",
-          mode: "no-cors",
-          headers: { "Content-Type": "text/plain" },
-          body: JSON.stringify(payload),
-        });
-      }
+      const res = await fetch(GOOGLE_SHEET_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ ...payload, sitio: "", segundos }),
+        signal: controller.signal,
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "La planilla no guardó la solicitud");
       setSubmitted(true);
-    } catch {
-      setError("Hubo un error al enviar. Por favor intenta de nuevo.");
+    } catch (err) {
+      console.error("Formulario Quiero manejar:", err);
+      setError("No pudimos confirmar que tu solicitud haya llegado. Intenta de nuevo en un momento o escríbenos por WhatsApp.");
+      setSendFailed(true);
       setLoading(false);
+    } finally {
+      clearTimeout(timeout);
     }
   };
 
@@ -112,6 +140,10 @@ export function ApplyPage() {
           .app-check:focus { box-shadow: 0 0 0 3px rgba(235,136,0,0.15); }
         `}</style>
         <div className="apply-form" style={{ background: theme.gray900, border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, padding: "clamp(20px, 5vw, 40px)" }}>
+          {/* Casillero trampa: las personas no lo ven; si viene completo, es un envío automático */}
+          <div aria-hidden="true" style={{ position: "absolute", left: -9999, width: 1, height: 1, overflow: "hidden" }}>
+            <label>No completar este campo <input ref={sitioRef} type="text" name="kp_extra" tabIndex={-1} autoComplete="off" /></label>
+          </div>
           <p style={{ fontSize: "0.82rem", color: theme.gray400, marginBottom: 24 }}>
             Los campos marcados con <span style={{ color: theme.orange }}>*</span> son obligatorios.
           </p>
@@ -264,7 +296,17 @@ export function ApplyPage() {
             {loading ? "Enviando..." : "Enviar solicitud →"}
           </button>
 
-          {error && <p style={{ color: "#ff4444", fontSize: "0.85rem", marginTop: 12 }}>{error}</p>}
+          {error && <p role="alert" style={{ color: "#ff8a80", fontSize: "0.95rem", lineHeight: 1.5, marginTop: 12 }}>{error}</p>}
+          {sendFailed && (
+            <a
+              href={`https://wa.me/${WHATSAPP_PUBLIC}?text=${encodeURIComponent("¡Hola! Quise completar el formulario para manejar con KPCars y no se envió. Me interesa alquilar un auto.")}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 48, marginTop: 12, borderRadius: 10, border: "1px solid rgba(255,255,255,0.28)", color: theme.white, fontWeight: 700, fontSize: "0.95rem", textDecoration: "none" }}
+            >
+              Escribir por WhatsApp
+            </a>
+          )}
         </div>
       </div>
     </div>
