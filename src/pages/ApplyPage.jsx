@@ -6,6 +6,21 @@ import { SectionLabel, SectionTitle, FormSection, FormGroup, FormRow } from "../
 // Nadie completa el formulario en menos de estos segundos: si llega antes, es un envío automático
 const MIN_SEGUNDOS = 5;
 
+// Dirección de nuestro servidor que recibe la solicitud y se la pasa a Google
+const SOLICITUD_URL = "/api/solicitud.php";
+
+// Envía los datos y devuelve la respuesta ya leída. Falla si no contestan a tiempo o si la respuesta no se entiende.
+async function enviar(url, contentType, body, esperaMs) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), esperaMs);
+  try {
+    const res = await fetch(url, { method: "POST", headers: { "Content-Type": contentType }, body, signal: controller.signal });
+    return await res.json();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export function ApplyPage() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
@@ -82,16 +97,12 @@ export function ApplyPage() {
 
     // Solo se muestra "¡Solicitud enviada!" si la planilla contesta que la guardó.
     // Se envía como texto plano para que el navegador pueda leer la respuesta de Google.
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 25000);
+    const body = JSON.stringify({ ...payload, sitio: "", segundos });
     try {
-      const res = await fetch(GOOGLE_SHEET_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ ...payload, sitio: "", segundos }),
-        signal: controller.signal,
-      });
-      const data = await res.json();
+      // Camino principal: nuestro propio servidor, que le pasa la solicitud a Google (ver public/api/solicitud.php).
+      // Si no está disponible (por ejemplo, probando en la compu), se le habla directo a Google como antes.
+      const viaServidor = await enviar(SOLICITUD_URL, "application/json", body, 40000).catch(() => null);
+      const data = viaServidor?.success ? viaServidor : await enviar(GOOGLE_SHEET_URL, "text/plain;charset=utf-8", body, 25000);
       if (!data.success) throw new Error(data.error || "La planilla no guardó la solicitud");
       setSubmitted(true);
     } catch (err) {
@@ -99,8 +110,6 @@ export function ApplyPage() {
       setError("No pudimos confirmar que tu solicitud haya llegado. Intenta de nuevo en un momento o escríbenos por WhatsApp.");
       setSendFailed(true);
       setLoading(false);
-    } finally {
-      clearTimeout(timeout);
     }
   };
 
