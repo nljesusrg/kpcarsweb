@@ -6,6 +6,55 @@ import { SectionLabel, SectionTitle, FormSection, FormGroup, FormRow } from "../
 // Nadie completa el formulario en menos de estos segundos: si llega antes, es un envío automático
 const MIN_SEGUNDOS = 5;
 
+/* Envío a la planilla de Google.
+   Google primero ejecuta el script (que guarda la fila) y recién después contesta con una redirección
+   hacia el resultado. El 13/10/2026 se vieron dos fallas de Google, mezcladas:
+     A) acepta la conexión pero nunca atiende el pedido: el script no corre y NO se guarda nada;
+     B) el script corre y guarda, pero el resultado nunca llega.
+   Por eso no se espera el resultado: alcanza con ver la redirección, que prueba que el script corrió.
+   Si en unos segundos no llega (falla A), el pedido no se atendió y se puede reintentar sin duplicar. */
+const MAX_INTENTOS = 7;
+const ESPERA_POR_INTENTO_MS = 6000; // cuando Google atiende, tarda entre 1 y 3 segundos
+
+async function enviarAPlanilla(body, onIntento) {
+  for (let intento = 1; intento <= MAX_INTENTOS; intento++) {
+    onIntento(intento);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), ESPERA_POR_INTENTO_MS);
+    try {
+      const res = await fetch(GOOGLE_SHEET_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body,
+        redirect: "manual",
+        signal: controller.signal,
+      });
+      // La redirección quiere decir que el script corrió
+      if (res.type === "opaqueredirect") return;
+      // Si Google contesta directo (sin redirección), se lee lo que dice
+      const data = await res.json().catch(() => null);
+      if (data?.success) return;
+      throw new Error(data?.error || `Respuesta inesperada de la planilla (${res.status})`);
+    } catch (err) {
+      // Solo se reintenta cuando se agotó la espera; cualquier otro error corta acá
+      if (err.name !== "AbortError" || intento === MAX_INTENTOS) throw err;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+}
+
+// Texto para WhatsApp con los datos ya completados, por si la planilla no responde
+const CAMPOS_WHATSAPP = [
+  ["nombre", "Nombre"], ["nacimiento", "Nacimiento"], ["direccion", "Dirección"], ["localidad", "Localidad"],
+  ["telefono", "Teléfono"], ["email", "Email"], ["licencia", "Licencia"], ["vigencia", "Vigencia de la licencia"],
+  ["urgencia", "Urgencia"], ["apps", "Apps"], ["alquilerPrevio", "Alquiler previo"], ["empresaAnterior", "Empresa anterior"],
+  ["referencia", "Cómo nos conoció"], ["comentario", "Comentario"],
+];
+const textoWhatsApp = (payload) =>
+  "¡Hola! Completé el formulario para manejar con KPCars y no se pudo enviar. Estos son mis datos:\n\n" +
+  CAMPOS_WHATSAPP.filter(([k]) => payload[k] && payload[k] !== "—").map(([k, label]) => `${label}: ${payload[k]}`).join("\n");
+
 export function ApplyPage() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
@@ -38,6 +87,8 @@ export function ApplyPage() {
   useEffect(() => { startedAt.current = Date.now(); }, []);
   // true cuando el envío falló: se ofrece escribir por WhatsApp
   const [sendFailed, setSendFailed] = useState(false);
+  const [intento, setIntento] = useState(1);
+  const [waText, setWaText] = useState("");
 
   const handleSubmit = async () => {
     // Mismos nombres y mismo orden que antes: los usa el script de Google Sheets
@@ -80,27 +131,16 @@ export function ApplyPage() {
       comentario: v.comentario || "—",
     };
 
-    // Solo se muestra "¡Solicitud enviada!" si la planilla contesta que la guardó.
-    // Se envía como texto plano para que el navegador pueda leer la respuesta de Google.
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 25000);
+    // Solo se muestra "¡Solicitud enviada!" si Google atendió el pedido (ver enviarAPlanilla, arriba)
     try {
-      const res = await fetch(GOOGLE_SHEET_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ ...payload, sitio: "", segundos }),
-        signal: controller.signal,
-      });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || "La planilla no guardó la solicitud");
+      await enviarAPlanilla(JSON.stringify({ ...payload, sitio: "", segundos }), setIntento);
       setSubmitted(true);
     } catch (err) {
       console.error("Formulario Quiero manejar:", err);
-      setError("No pudimos confirmar que tu solicitud haya llegado. Intenta de nuevo en un momento o escríbenos por WhatsApp.");
+      setError("No pudimos enviar tu solicitud. Envíanos tus datos por WhatsApp con el botón de abajo: ya están escritos, solo tienes que tocar enviar.");
+      setWaText(textoWhatsApp(payload));
       setSendFailed(true);
       setLoading(false);
-    } finally {
-      clearTimeout(timeout);
     }
   };
 
@@ -293,18 +333,18 @@ export function ApplyPage() {
             disabled={loading}
             style={{ width: "100%", padding: 15, background: loading ? theme.gray600 : theme.orange, color: theme.black, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: "0.95rem", border: "none", borderRadius: 12, cursor: loading ? "not-allowed" : "pointer", marginTop: 8 }}
           >
-            {loading ? "Enviando..." : "Enviar solicitud →"}
+            {loading ? (intento > 1 ? `Enviando... (intento ${intento} de ${MAX_INTENTOS})` : "Enviando...") : "Enviar solicitud →"}
           </button>
 
           {error && <p role="alert" style={{ color: "#ff8a80", fontSize: "0.95rem", lineHeight: 1.5, marginTop: 12 }}>{error}</p>}
           {sendFailed && (
             <a
-              href={`https://wa.me/${WHATSAPP_PUBLIC}?text=${encodeURIComponent("¡Hola! Quise completar el formulario para manejar con KPCars y no se envió. Me interesa alquilar un auto.")}`}
+              href={`https://wa.me/${WHATSAPP_PUBLIC}?text=${encodeURIComponent(waText)}`}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 48, marginTop: 12, borderRadius: 10, border: "1px solid rgba(255,255,255,0.28)", color: theme.white, fontWeight: 700, fontSize: "0.95rem", textDecoration: "none" }}
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 52, marginTop: 12, borderRadius: 10, background: "#25D366", color: theme.black, fontWeight: 700, fontSize: "1rem", textDecoration: "none" }}
             >
-              Escribir por WhatsApp
+              Enviar mis datos por WhatsApp
             </a>
           )}
         </div>
