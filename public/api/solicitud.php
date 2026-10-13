@@ -47,6 +47,24 @@ function enviarAGoogle(array $solicitud, int $espera): bool {
   return $codigo === 200 && is_array($respuesta) && !empty($respuesta['success']);
 }
 
+// Chequeo de estado (no guarda nada): /api/solicitud.php?estado
+// Le pregunta al script de Google si responde y dice cuántas solicitudes esperan ser reenviadas.
+if (isset($_GET['estado'])) {
+  $t0 = microtime(true);
+  $ch = curl_init(GOOGLE_URL);
+  curl_setopt_array($ch, [CURLOPT_FOLLOWLOCATION => true, CURLOPT_RETURNTRANSFER => true, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_TIMEOUT => 10]);
+  $cuerpo = curl_exec($ch);
+  $codigo = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+  curl_close($ch);
+  $archivo = dirname($_SERVER['DOCUMENT_ROOT']) . '/kpcars-solicitudes/pendientes.jsonl';
+  $pendientes = is_file($archivo) ? count(array_filter(array_map('trim', file($archivo)))) : 0;
+  responder([
+    'google' => $codigo === 200 && strpos((string) $cuerpo, 'KPCars API activa') !== false,
+    'segundos' => round(microtime(true) - $t0, 2),
+    'pendientes' => $pendientes,
+  ]);
+}
+
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') responder(['success' => false, 'error' => 'Solo POST'], 405);
 
 $datos = json_decode((string) file_get_contents('php://input', false, null, 0, 20000), true);
