@@ -28,11 +28,7 @@
 - Los estilos van escritos dentro de cada componente; no hay hojas de estilo aparte.
 
 ## Formulario "Quiero manejar" y Google Sheets
-- El formulario le envía los datos a un script de Google (Apps Script) que los guarda en una planilla.
-- **Incidente del 13 de octubre de 2026:** Google empezó a fallar más o menos la mitad de las veces, de dos formas: (A) acepta la conexión pero nunca atiende el pedido, el script no corre y no se guarda nada; (B) el script corre y guarda, pero el resultado nunca llega. El script y la planilla estaban bien (en "Ejecuciones" todo figuraba completado en 1 o 2 segundos). No se encontró la causa; no dependía de la página ni del script.
-- Por eso la página **no espera el resultado**: envía con `redirect: "manual"` y da por enviada la solicitud cuando Google contesta con la redirección, que prueba que el script corrió. Si en 6 segundos no contesta, reintenta (hasta 7 veces). Si todo falla, muestra un botón de WhatsApp con los datos ya escritos. Está explicado arriba de `enviarAPlanilla`, en `src/pages/ApplyPage.jsx`.
-- Consecuencia: la página ya no lee el `{ success: false }` que el script manda si falla al escribir en la planilla.
-- Leonardo quiere que el formulario funcione el 100% de las veces. Con el script de Google como único camino no se puede garantizar; la solución de fondo es que las solicitudes entren por el sistema propio (`kpcars.online`) y de ahí se copien a la planilla. Está en Linear.
+- El formulario le envía los datos a un script de Google (Apps Script) que los guarda en una planilla. El script contesta `{ success: true }` o `{ success: false, error }`, y la página muestra "¡Solicitud enviada!" solo si recibe `success: true`.
 - **No tocar el script de Google.** Decisión de Leonardo (6 de octubre de 2026): le costó mucho hacerlo funcionar. Cualquier mejora se hace del lado de la página. Si alguna vez hiciera falta cambiarlo, preguntarle antes y explicarle cómo volver atrás.
 - Los nombres de los datos que se envían (`nombre`, `nacimiento`, `direccion`, `localidad`, `telefono`, `email`, `licencia`, `vigencia`, `urgencia`, `apps`, `alquilerPrevio`, `empresaAnterior`, `referencia`, `comentario`) los usa el script para armar las columnas: no se cambian.
 - La página tiene dos trampas contra envíos automáticos: un casillero invisible y un mínimo de 5 segundos. No frenan a quien le escriba directo al script; si aparecen filas basura en la planilla, es por ahí.
