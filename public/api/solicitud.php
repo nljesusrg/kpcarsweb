@@ -55,11 +55,15 @@ if (!is_array($datos)) responder(['success' => false, 'error' => 'Datos inválid
 // Trampas para envíos automáticos: se contesta "bien" pero no se guarda nada
 if (!empty($datos['sitio']) || (int) ($datos['segundos'] ?? 0) < MIN_SEGUNDOS) responder(['success' => true]);
 
-// Solo los campos conocidos, como texto, con largo máximo y sin "=" al principio (para que la planilla no lo tome como fórmula)
+// Solo los campos conocidos, como texto y con largo máximo.
+// La planilla toma como fórmula lo que empieza con + = - o @ (un teléfono "+54 11..." quedaba como #ERROR!).
+// Un apóstrofo adelante le indica que es texto; el apóstrofo no se ve en la celda.
 $solicitud = [];
 foreach (CAMPOS as $campo) {
   $valor = is_scalar($datos[$campo] ?? '') ? trim((string) ($datos[$campo] ?? '')) : '';
-  $solicitud[$campo] = ltrim(mb_substr($valor, 0, MAX_LARGO), '=');
+  $valor = mb_substr(ltrim($valor, "'"), 0, MAX_LARGO);
+  if ($valor !== '' && strpos('+=-@', $valor[0]) !== false) $valor = "'" . $valor;
+  $solicitud[$campo] = $valor;
 }
 foreach (OBLIGATORIOS as $campo) {
   if ($solicitud[$campo] === '') responder(['success' => false, 'error' => 'Faltan datos obligatorios'], 422);
