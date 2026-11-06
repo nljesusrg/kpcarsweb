@@ -1,4 +1,7 @@
-import { RentalsIcon, FletesIcon, AuxiliosIcon } from "./components/Icons.jsx";
+import logoKpCars from "./assets/kpcars-logo-blanco.png";
+import logoCargas from "./assets/logos/kp-cargas.svg";
+import logoFlete from "./assets/logos/kp-flete.svg";
+import logoAuxilio from "./assets/logos/kp-auxilio.svg";
 
 /* Dirección (URL) de cada sección */
 export const pagePaths = {
@@ -9,6 +12,7 @@ export const pagePaths = {
   "change-password": "/cambiar-contrasena",
   dashboard: "/panel/inicio",
   turnos: "/turnos",
+  cargas: "/cargas",
   fletes: "/fletes",
   auxilios: "/auxilios",
 };
@@ -30,8 +34,9 @@ export const pageTitles = {
   "change-password": "Cambiar contraseña — KPCars",
   dashboard: "Mi Panel — KPCars",
   turnos: "Solicitar turno — KPCars",
-  fletes: "KPCars Fletes — Próximamente",
-  auxilios: "KPCars Auxilios — Próximamente",
+  cargas: "KP Cargas — Fletes, auxilios y más",
+  fletes: "Fletes — KP Cargas · Próximamente",
+  auxilios: "Auxilios — KP Cargas · Próximamente",
   "not-found": "Página no encontrada — KPCars",
 };
 
@@ -42,17 +47,25 @@ export const pageDescriptions = {
   catalog: "Conoce la flota de KPCars: Toyota Corolla 2015 en adelante, automáticos y manuales, con GNC y aire acondicionado. Alquiler semanal en Buenos Aires.",
   apply: "Completa el formulario para manejar con KPCars. Te contactamos para coordinar una entrevista y la entrega del auto.",
   login: "Zona Conductores de KPCars: ingresa con tu DNI para ver tus turnos, tus multas y tus datos.",
-  fletes: "KPCars Fletes llega próximamente. Mientras tanto, consúltanos por WhatsApp.",
-  auxilios: "KPCars Auxilios llega próximamente. Mientras tanto, consúltanos por WhatsApp.",
+  cargas: "KP Cargas reúne los servicios de transporte de KPCars: fletes, auxilios y más. Próximamente.",
+  fletes: "Fletes de KP Cargas, próximamente. Mientras tanto, consúltanos por WhatsApp.",
+  auxilios: "Auxilios de KP Cargas, próximamente. Mientras tanto, consúltanos por WhatsApp.",
 };
 export const getPageDescription = (page) => pageDescriptions[page] || DEFAULT_DESCRIPTION;
 
 /* Secciones que no deben aparecer en buscadores: las privadas y la de "no encontrada" */
 export const noIndexPages = ["dashboard", "turnos", "change-password", "not-found"];
 
-/* Áreas de KPCars. Rentals es la principal (es el inicio); las demás están en preparación. */
+/* Las dos áreas de KPCars, en el menú y en el inicio.
+   Rentals es la principal. KP Cargas agrupa los servicios de transporte (fletes, auxilios y los que vengan).
+   activeOn: secciones en las que esta área se marca como la actual en el menú. */
 export const areas = [
-  { key: "rentals", name: "KPCars Rentals", Icon: RentalsIcon, desc: "Alquiler de vehículos Toyota para trabajar en aplicaciones o de forma particular.", page: "catalog", cta: "Ver flota →" },
-  { key: "fletes", name: "KPCars Fletes", Icon: FletesIcon, page: "fletes", soon: true },
-  { key: "auxilios", name: "KPCars Auxilios", Icon: AuxiliosIcon, page: "auxilios", soon: true },
+  { key: "rentals", name: "KPCars Rentals", short: "Rentals", logo: logoKpCars, desc: "Alquiler de vehículos Toyota para trabajar en aplicaciones o de forma particular.", page: "catalog", cta: "Ver flota →", activeOn: ["catalog"] },
+  { key: "cargas", name: "KP Cargas", short: "Cargas", logo: logoCargas, desc: "Fletes, auxilios y más servicios de transporte.", page: "cargas", cta: "Ver servicios →", soon: true, activeOn: ["cargas", "fletes", "auxilios"] },
+];
+
+/* Servicios de KP Cargas. Para sumar uno: agregarlo acá, con su dirección en pagePaths y su título y descripción arriba. */
+export const cargasServices = [
+  { key: "fletes", name: "Fletes", logo: logoFlete, page: "fletes" },
+  { key: "auxilios", name: "Auxilios", logo: logoAuxilio, page: "auxilios" },
 ];

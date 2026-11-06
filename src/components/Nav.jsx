@@ -35,7 +35,7 @@ export function Nav({ page, navigate, menuOpen, setMenuOpen, user, onLogout }) {
         <div style={{ display: "flex", gap: 6, alignItems: "center" }} className="desktop-nav">
           <a style={s.link(page === "home")} onClick={() => navigate("home")}>Inicio</a>
           {areas.map((a) => (
-            <a key={a.key} style={s.link(page === a.page)} onClick={() => navigate(a.page)}>{a.name.replace("KPCars ", "")}</a>
+            <a key={a.key} style={s.link(a.activeOn.includes(page))} onClick={() => navigate(a.page)}>{a.short}</a>
           ))}
           {!user && <a style={s.cta} onClick={() => navigate("apply")}>Quiero manejar</a>}
           {user ? (
@@ -65,7 +65,7 @@ export function Nav({ page, navigate, menuOpen, setMenuOpen, user, onLogout }) {
           <div style={{ ...s.mobileLinks, zIndex: 99, position: "absolute" }}>
             <a style={s.link(page === "home")} onClick={() => navigate("home")}>Inicio</a>
             {areas.map((a) => (
-            <a key={a.key} style={s.link(page === a.page)} onClick={() => navigate(a.page)}>{a.name.replace("KPCars ", "")}</a>
+            <a key={a.key} style={s.link(a.activeOn.includes(page))} onClick={() => navigate(a.page)}>{a.short}</a>
           ))}
             <div style={{ height: 1, background: "rgba(255,255,255,0.06)", margin: "6px 0" }} />
             {user ? (

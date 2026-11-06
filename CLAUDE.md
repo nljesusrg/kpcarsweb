@@ -27,6 +27,13 @@
 - `panel/`: el área del chofer (inicio, turnos, multas, mis datos).
 - Los estilos van escritos dentro de cada componente; no hay hojas de estilo aparte.
 
+## Áreas de KPCars (noviembre 2026)
+- Dos áreas en el menú y en el inicio: **KPCars Rentals** (la principal: flota y alquiler) y **KP Cargas**.
+- KP Cargas es la marca que agrupa los servicios de transporte: hoy Fletes y Auxilios ("Próximamente"), y más adelante otros. Página propia en `/cargas`; cada servicio tiene la suya (`/fletes`, `/auxilios`).
+- Para sumar un servicio de KP Cargas: agregarlo en `cargasServices` (`src/routes.js`), con su dirección en `pagePaths` y su título y descripción. El menú no cambia.
+- Logos: `src/assets/logos/` (versión blanca sobre transparente de `Documentos/Logos_KP_imprenta`, recortada). Rentals usa el logo principal de KP Cars.
+- En la página los servicios van en plural ("Fletes", "Auxilios") y los logos tal cual ("FLETE", "AUXILIO"). Decisión de Leonardo.
+
 ## Formulario "Quiero manejar" y Google Sheets
 - **Cómo viaja una solicitud hoy:** el formulario se la envía a nuestro propio servidor (`public/api/solicitud.php`, que corre en Hostinger), y ese archivo se la pasa al script de Google (Apps Script), que la guarda en la planilla. Si nuestro servidor no está disponible (por ejemplo, probando en la compu con `npm run dev`), el formulario le habla directo a Google, como antes.
 - **Por qué (incidente del 13 de octubre de 2026):** los navegadores en Argentina dejaron de poder hablarle de forma confiable al script de Google: contestaba 1 de cada 10 veces, tanto por Starlink como por Movistar, y les pasaba también a candidatos de otros lugares. El script y la planilla estaban bien. Desde servidores en Estados Unidos (GitHub y Hostinger) contestaba siempre. No se supo la causa de fondo. Claude primero culpó a Google en general y después a la conexión de la oficina; las dos conclusiones eran incompletas. Lección: medir desde otra red y desde el servidor antes de sacar conclusiones.

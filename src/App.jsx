@@ -2,13 +2,14 @@ import { useState, useEffect } from "react";
 import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router";
 import { API_BASE, SITE_URL } from "./config.js";
 import { theme } from "./theme.js";
-import { pagePaths, pathPages, pageTitles, getPageDescription, noIndexPages, areas } from "./routes.js";
+import { pagePaths, pathPages, pageTitles, getPageDescription, noIndexPages, cargasServices } from "./routes.js";
 import { toAbsoluteUrl } from "./utils/format.js";
 import { Nav } from "./components/Nav.jsx";
 import { Footer } from "./components/Footer.jsx";
 import { WhatsAppButton } from "./components/WhatsAppButton.jsx";
 import { HomePage } from "./pages/HomePage.jsx";
 import { ComingSoonPage } from "./pages/ComingSoonPage.jsx";
+import { CargasPage } from "./pages/CargasPage.jsx";
 import { CatalogPage } from "./pages/CatalogPage.jsx";
 import { ApplyPage } from "./pages/ApplyPage.jsx";
 import { LoginPage } from "./pages/LoginPage.jsx";
@@ -355,8 +356,9 @@ export default function KPCarsApp() {
           <Route key={tab} path={`/panel/${tab}`} element={<Private user={user}><DashboardPage tab={tab} user={user} navigate={navigate} apiFetch={apiFetch} onUserUpdate={(updated) => { setUser(updated); localStorage.setItem("kpcars_user", JSON.stringify(updated)); }} /></Private>} />
         ))}
         <Route path="/turnos" element={<Private user={user}><TurnosPage user={user} apiFetch={apiFetch} /></Private>} />
-        {areas.filter((a) => a.soon).map((a) => (
-          <Route key={a.key} path={pagePaths[a.page]} element={<ComingSoonPage area={a} navigate={navigate} />} />
+        <Route path="/cargas" element={<CargasPage navigate={navigate} />} />
+        {cargasServices.map((sv) => (
+          <Route key={sv.key} path={pagePaths[sv.page]} element={<ComingSoonPage service={sv} navigate={navigate} />} />
         ))}
         {/* Dirección desconocida: página de "no encontrada" */}
         <Route path="*" element={<NotFoundPage navigate={navigate} />} />

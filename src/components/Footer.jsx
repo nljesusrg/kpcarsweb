@@ -1,6 +1,6 @@
 import { WHATSAPP_PUBLIC } from "../config.js";
 import { theme } from "../theme.js";
-import { areas } from "../routes.js";
+import { areas, cargasServices } from "../routes.js";
 import kpLogo from "../assets/kpcars-logo-blanco.png";
 
 export function Footer({ navigate, user }) {
@@ -30,6 +30,9 @@ export function Footer({ navigate, user }) {
         <FooterCol title="Servicios">
           {areas.map((a) => (
             <FooterLink key={a.key} onClick={() => navigate(a.page)}>{a.name}</FooterLink>
+          ))}
+          {cargasServices.map((sv) => (
+            <FooterLink key={sv.key} onClick={() => navigate(sv.page)}>{sv.name}</FooterLink>
           ))}
         </FooterCol>
         <FooterCol title="Contacto">
